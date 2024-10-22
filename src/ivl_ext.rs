@@ -1,5 +1,5 @@
 use slang::{
-    ast::{Expr, Name, Type},
+    ast::{Expr, Name, Type, Cases},
     Span,
 };
 use slang_ui::prelude::*;
@@ -28,6 +28,14 @@ impl IVLCmd {
             .reduce(|a, b| IVLCmd::seq(&a, &b))
             .unwrap_or(IVLCmd::nop())
     }
+
+    pub fn match_cases(body: &Cases) -> IVLCmd {
+        IVLCmd {
+            span: Span::default(),
+            kind: IVLCmdKind::Match { body: body.clone() },
+        }
+    }
+
     pub fn nondet(&self, other: &IVLCmd) -> IVLCmd {
         IVLCmd {
             span: Span::default(),
@@ -77,12 +85,19 @@ impl IVLCmd {
 impl std::fmt::Display for IVLCmd {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.kind {
-            IVLCmdKind::Assignment { name, expr } => write!(f, "{name} := {expr}"),
-            IVLCmdKind::Havoc { name, .. } => write!(f, "havoc {name}"),
-            IVLCmdKind::Assume { condition } => write!(f, "assume {condition}"),
-            IVLCmdKind::Assert { condition, .. } => write!(f, "assert {condition}"),
-            IVLCmdKind::Seq(c1, c2) => write!(f, "{c1} ; {c2}"),
-            IVLCmdKind::NonDet(c1, c2) => write!(f, "{{ {c1} }} [] {{ {c2} }}"),
+            IVLCmdKind::Assignment { name, expr } => write!(f, "{} := {}", name, expr),
+            IVLCmdKind::Havoc { name, .. } => write!(f, "havoc {}", name),
+            IVLCmdKind::Assume { condition } => write!(f, "assume {}", condition),
+            IVLCmdKind::Assert { condition, .. } => write!(f, "assert {}", condition),
+            IVLCmdKind::Seq(c1, c2) => write!(f, "{} ; {}", c1, c2),
+            IVLCmdKind::NonDet(c1, c2) => write!(f, "{{ {} }} [] {{ {} }}", c1, c2),
+            IVLCmdKind::Match { body } => {
+                let mut match_str = String::new();
+                for case in &body.cases {
+                    match_str.push_str(&format!("{} => {:?}, ", case.condition, case.cmd));
+                }
+                write!(f, "match {{ {} }}", match_str.trim_end_matches(", "))
+            },
         }
     }
 }
