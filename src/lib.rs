@@ -5,6 +5,7 @@ use ivl::{IVLCmd, IVLCmdKind};
 use slang::ast::{Cmd, CmdKind, Expr};
 use slang_ui::{prelude::*, Report};
 
+
 pub struct App;
 
 impl slang_ui::Hook for App {
@@ -107,6 +108,43 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
             Ok(IVLCmd::nondets(&cases))
         },
         CmdKind::Return { expr } => Ok(IVLCmd::return_ivl(expr)),
+
+        CmdKind::Loop { invariants, body, .. } => {
+            let mut ivl_invs: Vec<IVLCmd> = Vec::new();
+            for inv in invariants {
+                ivl_invs.push(IVLCmd::assume(inv));  // Assume  before loop iteration
+            }
+        
+            let mut ivl_seq: Vec<IVLCmd> = ivl_invs; // Loop seq in vector
+        
+            for case in &body.cases {
+                let ivl_body = cmd_to_ivlcmd(&case.cmd)?;  // Convert each body case into an IVL command
+        
+
+                // Assert the actual invariant before the loop body
+                for inv in invariants {
+                    ivl_seq.push(IVLCmd::assert(inv, "Invariant doesn't hold before iteration"));  // Check invariant before iteration
+                }
+        
+                ivl_seq.push(ivl_body);
+        
+                // Assert the actual invariant after the loop body
+                for inv in invariants {
+                    ivl_seq.push(IVLCmd::assert(inv, "Invariant doesn't hold after iteration"));  // Check invariant after iteration
+                }
+            }
+        
+            // Assert that the loop has been verified
+            let loop_end = IVLCmd::assert(&Expr::bool(true), "Loop not verified");
+        
+            ivl_seq.push(loop_end);  //Combine the loop sequence and last assertion
+        
+            return Ok(IVLCmd::seqs(&ivl_seq));  // Combine all commands into a sequence
+        }
+        
+        
+        
+        
         _ => todo!("Not supported (yet). cmd_to_ivlcmd"),
     }
 }
@@ -139,8 +177,7 @@ fn wp(ivl: &IVLCmd, post_condition: &Expr) -> Result<(Expr, String)> {
             match expr {
                 Some(e) => Ok((post_condition.subst_result(e), format!("couldnt return type {}", e))),
                 None           => Ok((post_condition.clone(), format!("Return without type failed")))
-            }
-        }
+        IVLCmdKind::Assume { condition } => Ok((condition.clone().imp(post_condition), format!("{} & {}", condition, post_condition))),
         _ => todo!("{}", format!("Not supported (yet). wp for {}", ivl)),
     }
 }
