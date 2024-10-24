@@ -1,3 +1,5 @@
+use std::collections::btree_set::Union;
+
 use slang::{
     ast::{Expr, Name, Type, Cases},
     Span,
@@ -9,7 +11,7 @@ use crate::ivl::{IVLCmd, IVLCmdKind};
 impl IVLCmd {
     pub fn assign(name: &Name, expr: &Expr) -> IVLCmd {
         IVLCmd {
-            span: Span::default(),
+            span: expr.span,
             kind: IVLCmdKind::Assignment {
                 name: name.clone(),
                 expr: expr.clone(),
@@ -18,7 +20,7 @@ impl IVLCmd {
     }
     pub fn seq(&self, other: &IVLCmd) -> IVLCmd {
         IVLCmd {
-            span: Span::default(),
+            span: Span::union(self.span, other.span),
             kind: IVLCmdKind::Seq(Box::new(self.clone()), Box::new(other.clone())),
         }
     }
@@ -29,19 +31,13 @@ impl IVLCmd {
             .unwrap_or(IVLCmd::nop())
     }
 
-    pub fn match_cases(body: &Cases) -> IVLCmd {
-        IVLCmd {
-            span: Span::default(),
-            kind: IVLCmdKind::Match { body: body.clone() },
-        }
-    }
-
     pub fn nondet(&self, other: &IVLCmd) -> IVLCmd {
         IVLCmd {
             span: Span::default(),
             kind: IVLCmdKind::NonDet(Box::new(self.clone()), Box::new(other.clone())),
         }
     }
+
     pub fn nondets(cmds: &[IVLCmd]) -> IVLCmd {
         cmds.iter()
             .cloned()
@@ -50,7 +46,7 @@ impl IVLCmd {
     }
     pub fn assume(condition: &Expr) -> IVLCmd {
         IVLCmd {
-            span: Span::default(),
+            span: condition.span,
             kind: IVLCmdKind::Assume {
                 condition: condition.clone(),
             },
@@ -58,7 +54,7 @@ impl IVLCmd {
     }
     pub fn assert(condition: &Expr, message: &str) -> IVLCmd {
         IVLCmd {
-            span: Span::default(),
+            span: condition.span,
             kind: IVLCmdKind::Assert {
                 condition: condition.clone(),
                 message: message.to_owned(),
@@ -74,6 +70,25 @@ impl IVLCmd {
             span: Span::default(),
         }
     }
+
+    pub fn return_ivl(expr: &Option<Expr>) -> IVLCmd {
+        if let Some(exprS) = expr {
+            IVLCmd { 
+                span: exprS.span,  
+                kind: IVLCmdKind::Return { 
+                        expr: expr.clone() 
+                } 
+            }
+        } else {
+            IVLCmd { 
+                span: Span::default(),
+                kind: IVLCmdKind::Return { 
+                        expr: expr.clone() 
+                } 
+            }
+        }
+    }
+
     pub fn nop() -> IVLCmd {
         IVLCmd::assume(&Expr::bool(true))
     }
@@ -91,13 +106,12 @@ impl std::fmt::Display for IVLCmd {
             IVLCmdKind::Assert { condition, .. } => write!(f, "assert {}", condition),
             IVLCmdKind::Seq(c1, c2) => write!(f, "{} ; {}", c1, c2),
             IVLCmdKind::NonDet(c1, c2) => write!(f, "{{ {} }} [] {{ {} }}", c1, c2),
-            IVLCmdKind::Match { body } => {
-                let mut match_str = String::new();
-                for case in &body.cases {
-                    match_str.push_str(&format!("{} => {:?}, ", case.condition, case.cmd));
+            IVLCmdKind::Return { expr } => {
+                match expr {
+                    Some(e) => write!(f, "return with {}", e),
+                    None           => write!(f, "return without") 
                 }
-                write!(f, "match {{ {} }}", match_str.trim_end_matches(", "))
-            },
+            }
         }
     }
 }

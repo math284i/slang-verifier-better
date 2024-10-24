@@ -2,8 +2,9 @@ pub mod ivl;
 mod ivl_ext;
 
 use ivl::{IVLCmd, IVLCmdKind};
-use slang::ast::{Case, Cmd, CmdKind, Expr};
-use slang_ui::prelude::*;
+use slang::ast::{Cmd, CmdKind, Expr};
+use slang_ui::{prelude::*, Report};
+
 
 pub struct App;
 
@@ -14,6 +15,10 @@ impl slang_ui::Hook for App {
 
         // Iterate methods
         for m in file.methods() {
+
+
+
+
             // Get method's preconditions;
             let pres = m.requires();
             // Merge them into a single condition
@@ -32,7 +37,16 @@ impl slang_ui::Hook for App {
             let ivl = cmd_to_ivlcmd(cmd)?;
             // Calculate obligation and error message (if obligation is not
             // verified)
-            let (oblig, msg) = wp(&ivl, &Expr::bool(true))?;
+            
+            // Get method's postconditions:
+            let posts = m.ensures();
+            // Merge them into a single condition
+            let post = posts
+                .cloned()
+                .reduce(|a, b| a & b)
+                .unwrap_or(Expr::bool(true));
+
+            let (oblig, msg) = wp(&ivl, &post)?;
             // Convert obligation to SMT expression
             let soblig = oblig.smt()?;
 
@@ -75,9 +89,7 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
             })
         },
         CmdKind::Assert { condition, .. } => Ok(IVLCmd::assert(condition, "Assert might fail!")),
-        CmdKind::Assume { condition } => {
-            Ok(IVLCmd::assume(condition))
-        },
+        CmdKind::Assume { condition } => Ok(IVLCmd::assume(condition)),
         CmdKind::VarDefinition { name, ty, expr } => {
             if let Some(expr) = expr {
                 Ok(IVLCmd::assign(name, expr))
@@ -95,6 +107,7 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
             }
             Ok(IVLCmd::nondets(&cases))
         },
+        CmdKind::Return { expr } => Ok(IVLCmd::return_ivl(expr)),
 
         CmdKind::Loop { invariants, body, .. } => {
             let mut ivl_invs: Vec<IVLCmd> = Vec::new();
@@ -138,40 +151,33 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
 
 // Weakest precondition of (assert-only) IVL programs comprised of a single
 // assertion
-fn wp(ivl: &IVLCmd, post_condition: &Expr) -> Result<(Expr, String)> {
+fn wp(ivl: &IVLCmd, post_condition: &Expr) -> Result<(Expr, String)> {  
     match &ivl.kind {
         IVLCmdKind::Seq(ivl1, ivl2) => {
+            if let IVLCmdKind::Return { .. } = ivl1.kind {
+                return Ok((Expr::bool(false),
+                    format!("Return statement found in the middle of a sequence! Return must be the last command.")
+                ));
+            }
+
             let (wp2, msg2) = wp(ivl2, post_condition)?;
             let (wp1, msg1) = wp(ivl1, &wp2)?;
             Ok((wp1, format!("msg2: {}", msg2)))
-        },
+        }
+        IVLCmdKind::Assume { condition } => Ok((condition.clone().imp(post_condition) , format!("{} => {}", condition, post_condition))),
         IVLCmdKind::Assert { condition, message } => Ok((condition.clone() & post_condition.clone(), message.clone())),
         IVLCmdKind::Havoc { name, ty } => Ok((post_condition.clone(), "Havoc".to_string())),
-        IVLCmdKind::Assignment {expr, name} => Ok((post_condition.subst_ident(&name.ident, expr), format!("{} := {}", name, expr))),
+        IVLCmdKind::Assignment { expr, name } => Ok((post_condition.subst_ident(&name.ident, expr), format!("{} := {}", name, expr))),
         IVLCmdKind::NonDet(ivl1, ivl2) => {
             let (wp1, msg1) = wp(ivl1, post_condition)?;
             let (wp2, msg2) = wp(ivl2, post_condition)?;
             Ok((wp1.clone().and(&wp2), format!("Msg1: {}, msg2: {}", msg1, msg2)))
         },
+        IVLCmdKind::Return { expr } => {
+            match expr {
+                Some(e) => Ok((post_condition.subst_result(e), format!("couldnt return type {}", e))),
+                None           => Ok((post_condition.clone(), format!("Return without type failed")))
         IVLCmdKind::Assume { condition } => Ok((condition.clone().imp(post_condition), format!("{} & {}", condition, post_condition))),
-        IVLCmdKind::Match { body } => {
-            let mut wps: Vec<Expr> = vec![];
-            let mut messages: Vec<String> = vec![];
-        
-            for case in &body.cases {
-                let (case_wp, msg) = wp(&cmd_to_ivlcmd(&case.cmd)?, post_condition)?;
-
-                let case_wp_with_condition = (!case.condition.clone()) | case_wp;
-                wps.push(case_wp_with_condition);
-                messages.push(msg);
-            }
-
-            let combined_wp = wps.into_iter().reduce(|a, b| a | b).unwrap_or(Expr::bool(true));
-        
-            let combined_msg = messages.join(", ");
-        
-            Ok((combined_wp, combined_msg))
-        },
         _ => todo!("{}", format!("Not supported (yet). wp for {}", ivl)),
     }
 }
