@@ -146,9 +146,7 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
             return Ok(IVLCmd::seqs(&ivl_seq));  // Combine all commands into a sequence
         }
         
-        
-        
-        
+
         _ => todo!("Not supported (yet). cmd_to_ivlcmd"),
     }
 }
@@ -202,8 +200,9 @@ fn wp(ivl: &IVLCmd, post_condition: &Expr, existing_names: &mut HashSet<String>)
         IVLCmdKind::Return { expr } => {
             match expr {
                 Some(e) => Ok((post_condition.subst_result(e), format!("couldnt return type {}", e))),
-                None           => Ok((post_condition.clone(), format!("Return without type failed")))
-        IVLCmdKind::Assume { condition } => Ok((condition.clone().imp(post_condition), format!("{} & {}", condition, post_condition))),
+                None           => Ok((post_condition.clone(), format!("Return without type failed"))),
+            }
+        }
         _ => todo!("{}", format!("Not supported (yet). wp for {}", ivl)),
     }
 }
