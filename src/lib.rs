@@ -4,6 +4,7 @@ mod ivl_ext;
 use ivl::{IVLCmd, IVLCmdKind};
 use slang::ast::{Cmd, CmdKind, Expr};
 use slang_ui::{prelude::*, Report};
+use std::collections::HashSet;
 
 pub struct App;
 
@@ -44,8 +45,8 @@ impl slang_ui::Hook for App {
                 .cloned()
                 .reduce(|a, b| a & b)
                 .unwrap_or(Expr::bool(true));
-
-            let (oblig, msg) = wp(&ivl, &post)?;
+            let mut existing_names = HashSet::new();
+            let (oblig, msg) = wp(&ivl, &post, &mut existing_names)?;
             // Convert obligation to SMT expression
             let soblig = oblig.smt()?;
 
@@ -91,7 +92,10 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
         CmdKind::Assume { condition } => Ok(IVLCmd::assume(condition)),
         CmdKind::VarDefinition { name, ty, expr } => {
             if let Some(expr) = expr {
-                Ok(IVLCmd::assign(name, expr))
+                Ok(IVLCmd {
+                    span: cmd.span.clone(),
+                    kind: IVLCmdKind::Seq(Box::new(IVLCmd::havoc(name, &ty.1)), Box::new(IVLCmd::assign(name, expr))),
+                })
             } else {
                 Ok(IVLCmd::havoc(name, &ty.1))
             }
@@ -111,9 +115,21 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
     }
 }
 
+
+fn GetNewNonExistingName(existing_names: &HashSet<String>) -> String {
+    let mut counter = 0;
+    loop {
+        let new_name = format!("expr{}", counter);
+        if !existing_names.contains(&new_name) {
+            return new_name;
+        }
+        counter += 1;
+    }
+}
+
 // Weakest precondition of (assert-only) IVL programs comprised of a single
 // assertion
-fn wp(ivl: &IVLCmd, post_condition: &Expr) -> Result<(Expr, String)> {  
+fn wp(ivl: &IVLCmd, post_condition: &Expr, existing_names: &mut HashSet<String>) -> Result<(Expr, String)> {  
     match &ivl.kind {
         IVLCmdKind::Seq(ivl1, ivl2) => {
             if let IVLCmdKind::Return { .. } = ivl1.kind {
@@ -122,17 +138,27 @@ fn wp(ivl: &IVLCmd, post_condition: &Expr) -> Result<(Expr, String)> {
                 ));
             }
 
-            let (wp2, msg2) = wp(ivl2, post_condition)?;
-            let (wp1, msg1) = wp(ivl1, &wp2)?;
+            let (wp2, msg2) = wp(ivl2, post_condition, existing_names)?;
+            let (wp1, msg1) = wp(ivl1, &wp2, existing_names)?;
             Ok((wp1, format!("msg2: {}", msg2)))
         }
         IVLCmdKind::Assume { condition } => Ok((condition.clone().imp(post_condition) , format!("{} => {}", condition, post_condition))),
         IVLCmdKind::Assert { condition, message } => Ok((condition.clone() & post_condition.clone(), message.clone())),
-        IVLCmdKind::Havoc { name, ty } => Ok((post_condition.clone(), "Havoc".to_string())),
+        IVLCmdKind::Havoc { name, ty } => {
+            let new_name = GetNewNonExistingName(existing_names);
+            existing_names.insert(new_name.clone());
+
+            //let new_expr = 
+            // TODO Havoc here is wrong, as it has to subst with a new expr with a new unique name, instead of post_condition as the second argument;
+            Ok((
+                post_condition.subst_ident(&name.ident, post_condition),
+                format!("Havoc: variable {} replaced with {}", name.ident, new_name),
+            ))
+        }
         IVLCmdKind::Assignment { expr, name } => Ok((post_condition.subst_ident(&name.ident, expr), format!("{} := {}", name, expr))),
         IVLCmdKind::NonDet(ivl1, ivl2) => {
-            let (wp1, msg1) = wp(ivl1, post_condition)?;
-            let (wp2, msg2) = wp(ivl2, post_condition)?;
+            let (wp1, msg1) = wp(ivl1, post_condition, existing_names)?;
+            let (wp2, msg2) = wp(ivl2, post_condition, existing_names)?;
             Ok((wp1.clone().and(&wp2), format!("Msg1: {}, msg2: {}", msg1, msg2)))
         },
         IVLCmdKind::Return { expr } => {
