@@ -109,11 +109,6 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
         },
         CmdKind::Return { expr } => Ok(IVLCmd::return_ivl(expr)),
 
-        
-        
-        
-        
-        
         _ => todo!("Not supported (yet). cmd_to_ivlcmd"),
     }
 }
@@ -146,7 +141,8 @@ fn wp(ivl: &IVLCmd, post_condition: &Expr) -> Result<(Expr, String)> {
             match expr {
                 Some(e) => Ok((post_condition.subst_result(e), format!("couldnt return type {}", e))),
                 None           => Ok((post_condition.clone(), format!("Return without type failed")))
-        IVLCmdKind::Assume { condition } => Ok((condition.clone().imp(post_condition), format!("{} & {}", condition, post_condition))),
+            }
+        }
         _ => todo!("{}", format!("Not supported (yet). wp for {}", ivl)),
     }
 }
