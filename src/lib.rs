@@ -2,9 +2,16 @@ pub mod ivl;
 mod ivl_ext;
 
 use ivl::{IVLCmd, IVLCmdKind};
-use slang::ast::{Cmd, CmdKind, Expr, ExprKind, Ident};
-use slang_ui::{prelude::{*, slang::ast::Name}, Report};
+use slang::{
+    ast::{Cmd, CmdKind, Expr, ExprKind, Ident},
+    Span,
+};
+use slang_ui::{
+    prelude::{slang::ast::Name, *},
+    Report,
+};
 use std::{collections::HashSet, iter::SkipWhile};
+use tracing::span;
 
 pub struct App;
 
@@ -42,34 +49,35 @@ impl slang_ui::Hook for App {
                 .reduce(|a, b| a & b)
                 .unwrap_or(Expr::bool(true));
             let mut existing_names = HashSet::new();
+            let mut spanlist: Vec<Expr> = Vec::new();
 
-            //TODO: Lav let om til for, fordi vi skal have wp til at blive swp der returner en liste, og så tjek wp på dem alle. 
+            //TODO: Lav let om til for, fordi vi skal have wp til at blive swp der returner en liste, og så tjek wp på dem alle.
+            //TODO post datastrukturen skal laves om, da det nu er en liste
+            for (e,s) in swp(&ivl, &post, &mut existing_names){
+                // Convert obligation to SMT expression
+                let soblig = e.smt()?;
 
-            let (oblig, msg) = wp(&ivl, &post, &mut existing_names)?;
-
-            // Convert obligation to SMT expression
-            let soblig = oblig.smt()?;
-
-            // Run the following solver-related statements in a closed scope.
-            // That is, after exiting the scope, all assertions are forgotten
-            // from subsequent executions of the solver
-            solver.scope(|solver| {
-                // Check validity of obligation
-                solver.assert(!soblig.as_bool()?)?;
-                // Run SMT solver on all current assertions
-                match solver.check_sat()? {
-                    // If the obligations result not valid, report the error (on
-                    // the span in which the error happens)
-                    smtlib::SatResult::Sat => {
-                        cx.error(oblig.span, format!("{msg}"));
+                // Run the following solver-related statements in a closed scope.
+                // That is, after exiting the scope, all assertions are forgotten
+                // from subsequent executions of the solver
+                solver.scope(|solver| {
+                    // Check validity of obligation
+                    solver.assert(!soblig.as_bool()?)?;
+                    // Run SMT solver on all current assertions
+                    match solver.check_sat()? {
+                        // If the obligations result not valid, report the error (on
+                        // the span in which the error happens)
+                        smtlib::SatResult::Sat => {
+                            cx.error(e.span, format!("{msg}"));
+                        }
+                        smtlib::SatResult::Unknown => {
+                            cx.warning(e.span, "{msg}: unknown sat result");
+                        }
+                        smtlib::SatResult::Unsat => (),
                     }
-                    smtlib::SatResult::Unknown => {
-                        cx.warning(oblig.span, "{msg}: unknown sat result");
-                    }
-                    smtlib::SatResult::Unsat => (),
-                }
-                Ok(())
-            })?;
+                    Ok(())
+                })?;
+            }
         }
 
         Ok(())
@@ -115,11 +123,16 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
         }
         CmdKind::Return { expr } => Ok(IVLCmd::return_ivl(expr)),
 
-        CmdKind::Loop { invariants, body, .. } => {
+        CmdKind::Loop {
+            invariants, body, ..
+        } => {
             let mut ivl_cmds: Vec<IVLCmd> = Vec::new();
 
             for inv in invariants {
-                ivl_cmds.push(IVLCmd::assert(inv, "Loop invariant doesn't hold before the loop."));
+                ivl_cmds.push(IVLCmd::assert(
+                    inv,
+                    "Loop invariant doesn't hold before the loop.",
+                ));
             }
             let vars = cmd.clone().assigned_vars();
             for var in vars {
@@ -135,17 +148,19 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
 
                 let encoded_cmd = cmd_to_ivlcmd(&case.cmd)?;
                 ivl_cmds.push(encoded_cmd);
-        
+
                 for inv in invariants {
-                    ivl_cmds.push(IVLCmd::assert(inv, "Loop invariant doesn't hold during the loop."));
+                    ivl_cmds.push(IVLCmd::assert(
+                        inv,
+                        "Loop invariant doesn't hold during the loop.",
+                    ));
                 }
             }
-        
-                //If an invariant fails beforehand, this will discard any paths that fail.
-                ivl_cmds.push(IVLCmd::assume(&Expr::bool(false)));
+
+            //If an invariant fails beforehand, this will discard any paths that fail.
+            ivl_cmds.push(IVLCmd::assume(&Expr::bool(false)));
             Ok(IVLCmd::seqs(&ivl_cmds))
         }
-            
 
         _ => todo!("Not supported (yet). cmd_to_ivlcmd"),
     }
@@ -168,11 +183,13 @@ fn GetNewNonExistingName(existing_names: &HashSet<String>) -> String {
 //TODO: skal laves om til swp (set weakest precondition, men brug liste fordi sets er weird - hjælpelæreren)
 //TODO: Vi skal ved hver commando, have ændret det span den ligesom bruger
 //, her kan man bruge commando, with_span, hvor man kan vælge om det er venstre eller højre side af sin kommando man vil have tjkket (det er så typisk højre)
-fn wp(
+
+//TODO: Alle ok skal laves om til return post_condition.push(Expr med det rigtige span)
+fn swp(
     ivl: &IVLCmd,
-    post_condition: &Expr,
+    post_condition: &Vec<(Expr, String)>,
     existing_names: &mut HashSet<String>,
-) -> Result<(Expr, String)> {
+) -> Vec<(Expr, String)> {
     match &ivl.kind {
         IVLCmdKind::Seq(ivl1, ivl2) => {
             if let IVLCmdKind::Return { .. } = ivl1.kind {
@@ -181,16 +198,20 @@ fn wp(
                 ));
             }
 
-            let (wp2, msg2) = wp(ivl2, post_condition, existing_names)?;
-            let (wp1, msg1) = wp(ivl1, &wp2, existing_names)?;
+            let (wp2, msg2) = wp(ivl2, post_condition, existing_names, spanlist)?;
+            let (wp1, msg1) = wp(ivl1, &wp2, existing_names, spanlist)?;
             Ok((wp1, format!("msg2: {}", msg2)))
         }
-        IVLCmdKind::Assume { condition } => Ok((
-            condition.clone().imp(post_condition),
-            format!("{} => {}", condition, post_condition),
-        )),
+        IVLCmdKind::Assume { condition } => {
+            // Assume skal gå igennem alle i post_condition og så skal de imp på hinanden. 
+            spanlist.push(post_condition.with_span(condition.span));
+            Ok((
+                condition.clone().imp(post_condition),
+                format!("{} => {}", condition, post_condition),
+            ))
+        }
         IVLCmdKind::Assert { condition, message } => {
-            Ok((condition.clone() & post_condition.clone(), message.clone()))
+            return post_condition.push((condition.clone() & post_condition.clone(), message.clone()));
         }
         IVLCmdKind::Havoc { name, ty } => {
             let new_name = GetNewNonExistingName(existing_names);
@@ -212,8 +233,8 @@ fn wp(
             format!("{} := {}", name, expr),
         )),
         IVLCmdKind::NonDet(ivl1, ivl2) => {
-            let (wp1, msg1) = wp(ivl1, post_condition, existing_names)?;
-            let (wp2, msg2) = wp(ivl2, post_condition, existing_names)?;
+            let (wp1, msg1) = wp(ivl1, post_condition, existing_names, spanlist)?;
+            let (wp2, msg2) = wp(ivl2, post_condition, existing_names, spanlist)?;
             Ok((
                 wp1.clone().and(&wp2),
                 format!("Msg1: {}, msg2: {}", msg1, msg2),
