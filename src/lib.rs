@@ -117,19 +117,31 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
             for inv in invariants {
                 ivl_cmds.push(IVLCmd::assert(inv, "Loop invariant doesn't hold before the loop."));
             }
-            let vars = cmd.assigned_vars();
+            let vars = cmd.clone().assigned_vars();
             for var in vars {
                 ivl_cmds.push(IVLCmd::havoc(&var.0, &var.1));
             }
             for inv in invariants {
                 ivl_cmds.push(IVLCmd::assume(inv));
             }
-            
-    
+            //if(b) But push the whole body as ivl
+            for case in &body.cases {
+                let condition = IVLCmd::assume(&case.condition);
+                ivl_cmds.push(condition);
 
-            Ok(full_loop_cmd)
+                let encoded_cmd = cmd_to_ivlcmd(&case.cmd)?;
+                ivl_cmds.push(encoded_cmd);
         
+                for inv in invariants {
+                    ivl_cmds.push(IVLCmd::assert(inv, "Loop invariant doesn't hold during the loop."));
+                }
+            }
+        
+                //If an invariant fails beforehand, this will discard any paths that fail.
+                ivl_cmds.push(IVLCmd::assume(&Expr::bool(false)));
+            Ok(IVLCmd::seqs(&ivl_cmds))
         }
+            
 
         _ => todo!("Not supported (yet). cmd_to_ivlcmd"),
     }
