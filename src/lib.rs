@@ -111,44 +111,25 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
         }
         CmdKind::Return { expr } => Ok(IVLCmd::return_ivl(expr)),
 
-        CmdKind::Loop {
-            invariants, body, ..
-        } => {
+        CmdKind::Loop { invariants, body, .. } => {
             let mut ivl_invs: Vec<IVLCmd> = Vec::new();
-            for inv in invariants {
-                ivl_invs.push(IVLCmd::assume(inv)); // Assume  before loop iteration
+
+            for inv in invariants { // Assert the invariant before loop
+                ivl_invs.push(IVLCmd::assert(inv, "Loop not verified / Invariant doesn't hold before entering the loop"));
             }
 
-            let mut ivl_seq: Vec<IVLCmd> = ivl_invs; // Loop seq in vector
-
+            let mut cases: Vec<IVLCmd> = vec![];
             for case in &body.cases {
-                let ivl_body = cmd_to_ivlcmd(&case.cmd)?; // Convert each body case into an IVL command
+                for cmd in &case.cmd {
 
-                // Assert the actual invariant before the loop body
-                for inv in invariants {
-                    ivl_seq.push(IVLCmd::assert(
-                        inv,
-                        "Invariant doesn't hold before iteration",
-                    )); // Check invariant before iteration
                 }
-
-                ivl_seq.push(ivl_body);
-
-                // Assert the actual invariant after the loop body
-                for inv in invariants {
-                    ivl_seq.push(IVLCmd::assert(
-                        inv,
-                        "Invariant doesn't hold after iteration",
-                    )); // Check invariant after iteration
-                }
+                
             }
 
-            // Assert that the loop has been verified
-            let loop_end = IVLCmd::assert(&Expr::bool(true), "Loop not verified");
-
-            ivl_seq.push(loop_end); //Combine the loop sequence and last assertion
-
-            return Ok(IVLCmd::seqs(&ivl_seq)); // Combine all commands into a sequence
+            for inv in invariants { // Assume  before loop iteration
+                ivl_invs.push(IVLCmd::assume(inv)); 
+            }
+        
         }
 
         _ => todo!("Not supported (yet). cmd_to_ivlcmd"),
@@ -210,53 +191,6 @@ fn wp(
                 post_condition.subst_ident(&name.ident, &new_expr),
                 format!("Havoc: variable {} replaced with {}", name.ident, new_name),
             ))
-        }
-
-        CmdKind::Loop { invariants, body, .. } => {
-            let mut ivl_invs: Vec<IVLCmd> = Vec::new();
-
-            for inv in invariants { // Assert the invariant before loop
-                ivl_invs.push(IVLCmd::assert(inv, "Loop not verified / Invariant doesn't hold before entering the loop"));
-            }
-
-            let mut cases: Vec<IVLCmd> = vec![];
-            for case in &body.cases {
-                for cmd in &case.cmd {
-
-                }
-                
-            }
-
-            for inv in invariants { // Assume  before loop iteration
-                ivl_invs.push(IVLCmd::assume(inv)); 
-            }
-        
-            let mut ivl_seq: Vec<IVLCmd> = ivl_invs; // Loop seq in vector
-
-        
-            for case in &body.cases {
-                let ivl_body = cmd_to_ivlcmd(&case.cmd)?;  // Convert each body case into an IVL command
-        
-
-                // Assert the invariant before the loop body
-                for inv in invariants {
-                    ivl_seq.push(IVLCmd::assert(inv, "Invariant doesn't hold before iteration"));  // Check invariant before iteration
-                }
-        
-                ivl_seq.push(ivl_body);
-        
-                // Assert the invariant after the loop body
-                for inv in invariants {
-                    ivl_seq.push(IVLCmd::assert(inv, "Invariant doesn't hold after iteration"));  // Check invariant after iteration
-                }
-            }
-        
-            // Assert that the invariant hold after loop
-            for inv in invariants {
-                ivl_seq.push(IVLCmd::assert(inv, "Loop not verified / Invariant doesn't hold after exiting the loop"));
-            }
-        
-            return Ok(IVLCmd::seqs(&ivl_seq));  // Combine all commands into a sequence
         }
 
         IVLCmdKind::Assignment { expr, name } => Ok((
