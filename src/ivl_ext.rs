@@ -1,7 +1,7 @@
 use std::collections::btree_set::Union;
 
 use slang::{
-    ast::{Expr, Name, Type, Cases},
+    ast::{Expr, Name, Type},
     Span,
 };
 use slang_ui::prelude::*;
