@@ -3,8 +3,8 @@ mod ivl_ext;
 
 use ivl::{IVLCmd, IVLCmdKind};
 use slang::ast::{Cmd, CmdKind, Expr, ExprKind, Ident};
-use slang_ui::{prelude::*, Report};
-use std::collections::HashSet;
+use slang_ui::{prelude::{*, slang::ast::Name}, Report};
+use std::{collections::HashSet, iter::SkipWhile};
 
 pub struct App;
 
@@ -112,23 +112,22 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
         CmdKind::Return { expr } => Ok(IVLCmd::return_ivl(expr)),
 
         CmdKind::Loop { invariants, body, .. } => {
-            let mut ivl_invs: Vec<IVLCmd> = Vec::new();
+            let mut ivl_cmds: Vec<IVLCmd> = Vec::new();
 
-            for inv in invariants { // Assert the invariant before loop
-                ivl_invs.push(IVLCmd::assert(inv, "Loop not verified / Invariant doesn't hold before entering the loop"));
+            for inv in invariants {
+                ivl_cmds.push(IVLCmd::assert(inv, "Loop invariant doesn't hold before the loop."));
             }
-
-            let mut cases: Vec<IVLCmd> = vec![];
-            for case in &body.cases {
-                for cmd in &case.cmd {
-
-                }
-                
+            let vars = cmd.assigned_vars();
+            for var in vars {
+                ivl_cmds.push(IVLCmd::havoc(&var.0, &var.1));
             }
-
-            for inv in invariants { // Assume  before loop iteration
-                ivl_invs.push(IVLCmd::assume(inv)); 
+            for inv in invariants {
+                ivl_cmds.push(IVLCmd::assume(inv));
             }
+            
+    
+
+            Ok(full_loop_cmd)
         
         }
 
