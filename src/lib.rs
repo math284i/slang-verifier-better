@@ -197,12 +197,13 @@ fn wp(
             existing_names.insert(new_name.clone());
             let ident = Ident(new_name.clone());
 
-            let expr_kind = ExprKind::Ident(ident);
+            // let expr_kind = ExprKind::Ident(ident);
 
             let span = name.span.clone(); // Replace with actual span if available
             let ty = ty.clone(); // Replace with actual type if available
 
-            let new_expr = Expr::new(span, expr_kind);
+            let new_expr = Expr::ident(&ident, &ty);
+            // let new_expr = Expr::new(span, expr_kind);
 
             // TODO Havoc here is wrong, as it has to subst with a new expr with a new unique name, instead of post_condition as the second argument;
             Ok((
