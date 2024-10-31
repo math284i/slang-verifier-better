@@ -42,7 +42,11 @@ impl slang_ui::Hook for App {
                 .reduce(|a, b| a & b)
                 .unwrap_or(Expr::bool(true));
             let mut existing_names = HashSet::new();
+
+            //TODO: Lav let om til for, fordi vi skal have wp til at blive swp der returner en liste, og så tjek wp på dem alle. 
+
             let (oblig, msg) = wp(&ivl, &post, &mut existing_names)?;
+
             // Convert obligation to SMT expression
             let soblig = oblig.smt()?;
 
@@ -160,6 +164,10 @@ fn GetNewNonExistingName(existing_names: &HashSet<String>) -> String {
 
 // Weakest precondition of (assert-only) IVL programs comprised of a single
 // assertion
+
+//TODO: skal laves om til swp (set weakest precondition, men brug liste fordi sets er weird - hjælpelæreren)
+//TODO: Vi skal ved hver commando, have ændret det span den ligesom bruger
+//, her kan man bruge commando, with_span, hvor man kan vælge om det er venstre eller højre side af sin kommando man vil have tjkket (det er så typisk højre)
 fn wp(
     ivl: &IVLCmd,
     post_condition: &Expr,
