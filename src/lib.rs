@@ -19,59 +19,52 @@ impl slang_ui::Hook for App {
     fn analyze(&self, cx: &mut slang_ui::Context, file: &slang::SourceFile) -> Result<()> {
         // Get reference to Z3 solver
         let mut solver = cx.solver()?;
-
+    
         // Iterate methods
         for m in file.methods() {
-            // Get method's preconditions;
-            let pres = m.requires();
-            // Merge them into a single condition
-            let pre = pres
+            // Get method's preconditions and combine them
+            let pre = m.requires()
                 .cloned()
                 .reduce(|a, b| a & b)
                 .unwrap_or(Expr::bool(true));
-            // Convert the expression into an SMT expression
+            
+            // Convert precondition to SMT and assert it
             let spre = pre.smt()?;
-            // Assert precondition
             solver.assert(spre.as_bool()?)?;
-
-            // Get method's body
+    
+            // Get method's body and convert it to IVL
             let cmd = &m.body.clone().unwrap().cmd;
-            // Encode it in IVL
             let ivl = cmd_to_ivlcmd(cmd)?;
-            // Calculate obligation and error message (if obligation is not
-            // verified)
-
-            // Get method's postconditions:
-            let posts = m.ensures();
-            // Merge them into a single condition
-            let post = posts
+    
+            // Get method's postconditions and combine them
+            let post = m.ensures()
                 .cloned()
                 .reduce(|a, b| a & b)
                 .unwrap_or(Expr::bool(true));
+            
             let mut existing_names = HashSet::new();
-            let mut spanlist: Vec<Expr> = Vec::new();
-
-            //TODO: Lav let om til for, fordi vi skal have wp til at blive swp der returner en liste, og så tjek wp på dem alle.
-            //TODO post datastrukturen skal laves om, da det nu er en liste
-            for (e,s) in swp(&ivl, &post, &mut existing_names){
+            let mut spanlist: Vec<(Expr, String)> = Vec::new(); // Initialize as a vector of `(Expr, String)` pairs
+    
+            // Call `swp`, which now returns a `Vec<(Expr, String)>`
+            let obligations = swp(&ivl, &mut spanlist, &mut existing_names);
+    
+            // Iterate over each `(Expr, String)` in the obligations list
+            for (obligation_expr, msg) in obligations {
                 // Convert obligation to SMT expression
-                let soblig = e.smt()?;
-
-                // Run the following solver-related statements in a closed scope.
-                // That is, after exiting the scope, all assertions are forgotten
-                // from subsequent executions of the solver
+                let soblig = obligation_expr.smt()?;
+    
+                // Use the solver within a closed scope for each obligation
                 solver.scope(|solver| {
-                    // Check validity of obligation
+                    // Check validity of the obligation
                     solver.assert(!soblig.as_bool()?)?;
-                    // Run SMT solver on all current assertions
+                    
                     match solver.check_sat()? {
-                        // If the obligations result not valid, report the error (on
-                        // the span in which the error happens)
                         smtlib::SatResult::Sat => {
-                            cx.error(e.span, format!("{msg}"));
+                            // If the obligation is not valid, report the error with its message
+                            cx.error(obligation_expr.span, msg.clone());
                         }
                         smtlib::SatResult::Unknown => {
-                            cx.warning(e.span, "{msg}: unknown sat result");
+                            cx.warning(obligation_expr.span, format!("{msg}: unknown sat result"));
                         }
                         smtlib::SatResult::Unsat => (),
                     }
@@ -79,9 +72,10 @@ impl slang_ui::Hook for App {
                 })?;
             }
         }
-
+    
         Ok(())
     }
+    
 }
 
 // Encoding of (assert-only) statements into IVL (for programs comprised of only
@@ -187,69 +181,120 @@ fn GetNewNonExistingName(existing_names: &HashSet<String>) -> String {
 //TODO: Alle ok skal laves om til return post_condition.push(Expr med det rigtige span)
 fn swp(
     ivl: &IVLCmd,
-    post_condition: &Vec<(Expr, String)>,
+    post_condition: &mut Vec<(Expr, String)>,
     existing_names: &mut HashSet<String>,
 ) -> Vec<(Expr, String)> {
     match &ivl.kind {
         IVLCmdKind::Seq(ivl1, ivl2) => {
             if let IVLCmdKind::Return { .. } = ivl1.kind {
-                return Ok((Expr::bool(false),
-                    format!("Return statement found in the middle of a sequence! Return must be the last command.")
+                post_condition.push((
+                    Expr::bool(false),
+                    String::from("Return statement found in the middle of a sequence! Return must be the last command.")
                 ));
+                return post_condition.clone();
             }
 
-            let (wp2, msg2) = wp(ivl2, post_condition, existing_names, spanlist)?;
-            let (wp1, msg1) = wp(ivl1, &wp2, existing_names, spanlist)?;
-            Ok((wp1, format!("msg2: {}", msg2)))
+            swp(ivl2, post_condition, existing_names);
+            swp(ivl1, post_condition, existing_names);
+            post_condition.clone()
         }
         IVLCmdKind::Assume { condition } => {
-            // Assume skal gå igennem alle i post_condition og så skal de imp på hinanden. 
-            spanlist.push(post_condition.with_span(condition.span));
-            Ok((
-                condition.clone().imp(post_condition),
-                format!("{} => {}", condition, post_condition),
-            ))
+            // Create a single conjunction of all expressions in `post_condition`
+            let combined_expr = post_condition.iter()
+                .fold(condition.clone(), |acc, (expr, _)| acc.imp(&expr.clone()));
+
+            post_condition.push((
+                combined_expr,
+                format!("{} => {:?}", condition, post_condition),
+            ));
+            return post_condition.clone();
         }
         IVLCmdKind::Assert { condition, message } => {
-            return post_condition.push((condition.clone() & post_condition.clone(), message.clone()));
+            // Create a single conjunction of all expressions in `post_condition`
+            let combined_expr = post_condition.iter()
+                .fold(condition.clone(), |acc, (expr, _)| acc.and(&expr.clone()));
+
+            post_condition.push((
+                combined_expr,
+                message.clone(),
+            ));
+            return post_condition.clone();
         }
         IVLCmdKind::Havoc { name, ty } => {
             let new_name = GetNewNonExistingName(existing_names);
             existing_names.insert(new_name.clone());
             let ident = Ident(new_name.clone());
+            let new_expr = Expr::ident(&ident, &ty);
 
-            let ty = ty.clone();
-
-            let new_expr = Expr::ident(&ident, &ty); //ident = new ident
-
-            Ok((
-                post_condition.subst_ident(&name.ident, &new_expr),
-                format!("Havoc: variable {} replaced with {}", name.ident, new_name),
-            ))
+            let updated_exprs: Vec<Expr> = post_condition.iter()
+                .map(|(expr, _)| expr.subst_ident(&name.ident, &new_expr))
+                .collect();
+            
+            for expr in updated_exprs {
+                post_condition.push((
+                    expr,
+                    format!("Havoc: variable {} replaced with {}", name.ident, new_name),
+                ));
+            }
+            return post_condition.clone();
         }
+        IVLCmdKind::Assignment { expr, name } => {
+            let updated_exprs: Vec<Expr> = post_condition.iter()
+                .map(|(p_expr, _)| p_expr.subst_ident(&name.ident, expr))
+                .collect();
 
-        IVLCmdKind::Assignment { expr, name } => Ok((
-            post_condition.subst_ident(&name.ident, expr),
-            format!("{} := {}", name, expr),
-        )),
+            for expr in updated_exprs {
+                post_condition.push((
+                    expr.clone(),
+                    format!("{} := {}", name, expr),
+                ));
+            }
+            return post_condition.clone();
+        }
         IVLCmdKind::NonDet(ivl1, ivl2) => {
-            let (wp1, msg1) = wp(ivl1, post_condition, existing_names, spanlist)?;
-            let (wp2, msg2) = wp(ivl2, post_condition, existing_names, spanlist)?;
-            Ok((
-                wp1.clone().and(&wp2),
-                format!("Msg1: {}, msg2: {}", msg1, msg2),
-            ))
+            let msg1;
+            let msg2;
+
+            swp(ivl1, post_condition, existing_names);
+            msg1 = post_condition.last().map(|(_, msg)| msg.clone()).unwrap_or_default();
+
+            swp(ivl2, post_condition, existing_names);
+            msg2 = post_condition.last().map(|(_, msg)| msg.clone()).unwrap_or_default();
+
+            let expr1 = post_condition.iter().map(|(expr, _)| expr.clone()).last().unwrap();
+            let expr2 = post_condition.iter().map(|(expr, _)| expr.clone()).last().unwrap();
+
+            post_condition.push((
+                expr1.and(&expr2),
+                format!("Msg1: {}, Msg2: {}", msg1, msg2),
+            ));
+            return post_condition.clone();
         }
-        IVLCmdKind::Return { expr } => match expr {
-            Some(e) => Ok((
-                post_condition.subst_result(e),
-                format!("couldnt return type {}", e),
-            )),
-            None => Ok((
-                post_condition.clone(),
-                format!("Return without type failed"),
-            )),
-        },
+        IVLCmdKind::Return { expr } => {
+            match expr {
+                Some(e) => {
+                    let updated_exprs: Vec<Expr> = post_condition.iter()
+                        .map(|(p_expr, _)| p_expr.subst_result(e))
+                        .collect();
+
+                    for expr in updated_exprs {
+                        post_condition.push((
+                            expr,
+                            format!("Couldn't return type {}", e),
+                        ));
+                    }
+                }
+                None => {
+                    let last_expr = post_condition.last().map(|(expr, _)| expr.clone()).unwrap();
+                    post_condition.push((
+                        last_expr,
+                        String::from("Return without type failed"),
+                    ));
+                }
+            }
+            return post_condition.clone();
+        }
         _ => todo!("{}", format!("Not supported (yet). wp for {}", ivl)),
     }
 }
+
