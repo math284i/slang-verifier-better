@@ -84,7 +84,7 @@ impl slang_ui::Hook for App {
 // a single assertion)
 fn cmd_to_ivlcmd(
     cmd: &Cmd,
-    post_condition: &Vec<(Expr, String)>, // post_condition tilføjet her
+    post_condition: &Vec<(Expr, String)>,
 ) -> Result<IVLCmd> {
     match &cmd.kind {
         CmdKind::Seq(cmd1, cmd2) => {
@@ -210,7 +210,7 @@ fn swp(
             // Process each element in post_condition and apply implication
             let mut new_post_conditions = Vec::new();
             for (expr, msg) in post_condition {
-                let new_expr = condition.clone().imp(&expr.clone());
+                let new_expr = condition.clone().imp(&expr.clone()).with_span(condition.span);
                 let new_msg = format!("{} => {}", condition, msg);
                 new_post_conditions.push((new_expr, new_msg));
             }
