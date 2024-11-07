@@ -210,7 +210,7 @@ fn swp(
             // Process each element in post_condition and apply implication
             let mut new_post_conditions = Vec::new();
             for (expr, msg) in post_condition {
-                let new_expr = condition.clone().imp(&expr.clone()).with_span(condition.span);
+                let new_expr = condition.clone().imp(&expr.clone()).with_span(expr.span);
                 let new_msg = format!("{} => {}", condition, msg);
                 new_post_conditions.push((new_expr, new_msg));
             }
@@ -229,13 +229,13 @@ fn swp(
             let new_expr = Expr::ident(&ident, ty);
             post_condition
                 .iter()
-                .map(|(expr, msg)| (expr.clone().subst_ident(&name.ident, &new_expr), msg.clone()))
+                .map(|(expr, msg)| (expr.clone().subst_ident(&name.ident, &new_expr).with_span(expr.span), msg.clone()))
                 .collect()
         }
         IVLCmdKind::Assignment { expr, name } => post_condition
             .iter()
             .map(|(cond_expr, msg)| {
-                (cond_expr.clone().subst_ident(&name.ident, expr), msg.clone())
+                (cond_expr.clone().subst_ident(&name.ident, expr).with_span(cond_expr.span), msg.clone())
             })
             .collect(),
         IVLCmdKind::NonDet(ivl1, ivl2) => {
@@ -248,7 +248,7 @@ fn swp(
         IVLCmdKind::Return { expr } => match expr {
             Some(e) => post_condition
                 .iter()
-                .map(|(cond_expr, msg)| (cond_expr.clone().subst_result(e), msg.clone()))
+                .map(|(cond_expr, msg)| (cond_expr.clone().subst_result(e).with_span(cond_expr.span), msg.clone()))
                 .collect(),
             None => post_condition.clone(),
         },
