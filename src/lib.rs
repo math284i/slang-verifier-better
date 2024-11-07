@@ -211,7 +211,7 @@ fn swp(
             let mut new_post_conditions = Vec::new();
             for (expr, msg) in post_condition {
                 let new_expr = condition.clone().imp(&expr.clone()).with_span(expr.span);
-                let new_msg = format!("{} => {}", condition, msg);
+                let new_msg = format!("{} => {}", expr, msg);
                 new_post_conditions.push((new_expr, new_msg));
             }
             new_post_conditions
