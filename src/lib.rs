@@ -31,12 +31,12 @@ impl slang_ui::Hook for App {
   
             let posts = m.ensures();
 
-            let post:Vec<(Expr, String)> = posts.map(|expr| (expr.clone(), "Error of post".to_string())).collect();
+            let post_condition:Vec<(Expr, String)> = posts.map(|expr| (expr.clone(), "Error of post".to_string())).collect();
             
-            let ivl = cmd_to_ivlcmd(cmd, &post)?;
+            let ivl = cmd_to_ivlcmd(cmd, &post_condition)?;
             let mut existing_names = HashSet::new();
 
-            for (e,s) in swp(&ivl, &post, &mut existing_names){
+            for (e,s) in swp(&ivl, &post_condition, &mut existing_names){
 
                 // Convert obligation to SMT expression
                 let soblig = e.smt()?;
@@ -199,9 +199,9 @@ fn swp(
             new_post_conditions
         }
         IVLCmdKind::Assert { condition, message } => {
-            let mut post = post_condition.clone();
-            post.push((condition.clone(), message.clone()));
-            post
+            let mut new_post_conditions = post_condition.clone();
+            new_post_conditions.push((condition.clone(), message.clone()));
+            new_post_conditions
         }
         IVLCmdKind::Havoc { name, ty } => {
             let new_name = get_new_non_existing_name(existing_names);
