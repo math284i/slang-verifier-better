@@ -2,16 +2,9 @@ pub mod ivl;
 mod ivl_ext;
 
 use ivl::{IVLCmd, IVLCmdKind};
-use slang::{
-    ast::{Cmd, CmdKind, Expr, ExprKind, Ident},
-    Span,
-};
-use slang_ui::{
-    prelude::{slang::ast::Name, *},
-    Report,
-};
-use std::{collections::HashSet, iter::SkipWhile};
-use tracing::span;
+use slang::ast::{Cmd, CmdKind, Expr, Ident};
+use slang_ui::prelude::*;
+use std::collections::HashSet;
 
 pub struct App;
 
@@ -34,17 +27,12 @@ impl slang_ui::Hook for App {
             // Assert precondition
             solver.assert(spre.as_bool()?)?;
 
-            // Get method's body
             let cmd = &m.body.clone().unwrap().cmd;
-            // Encode it in IVL
-
-            // Calculate obligation and error message (if obligation is not
-            // verified)
-
-            // Get method's postconditions:
+  
             let posts = m.ensures();
-            // Merge them into a single condition
+
             let post:Vec<(Expr, String)> = posts.map(|expr| (expr.clone(), "Error of post".to_string())).collect();
+            
             let ivl = cmd_to_ivlcmd(cmd, &post)?;
             let mut existing_names = HashSet::new();
 
@@ -176,7 +164,7 @@ fn cmd_to_ivlcmd(
 }
 
 
-fn GetNewNonExistingName(existing_names: &HashSet<String>) -> String {
+fn get_new_non_existing_name(existing_names: &HashSet<String>) -> String {
     let mut counter = 0;
     loop {
         let new_name = format!("expr{}", counter);
@@ -189,12 +177,6 @@ fn GetNewNonExistingName(existing_names: &HashSet<String>) -> String {
 
 // Weakest precondition of (assert-only) IVL programs comprised of a single
 // assertion
-
-//TODO: skal laves om til swp (set weakest precondition, men brug liste fordi sets er weird - hjælpelæreren)
-//TODO: Vi skal ved hver commando, have ændret det span den ligesom bruger
-//, her kan man bruge commando, with_span, hvor man kan vælge om det er venstre eller højre side af sin kommando man vil have tjkket (det er så typisk højre)
-
-//TODO: Alle ok skal laves om til return post_condition.push(Expr med det rigtige span)
 fn swp(
     ivl: &IVLCmd,
     post_condition: &Vec<(Expr, String)>,
@@ -222,7 +204,7 @@ fn swp(
             post
         }
         IVLCmdKind::Havoc { name, ty } => {
-            let new_name = GetNewNonExistingName(existing_names);
+            let new_name = get_new_non_existing_name(existing_names);
             existing_names.insert(new_name.clone());
             let ident = Ident(new_name.clone());
 
@@ -251,7 +233,7 @@ fn swp(
                 .map(|(cond_expr, msg)| (cond_expr.clone().subst_result(e).with_span(cond_expr.span), msg.clone()))
                 .collect(),
             None => post_condition.clone(),
-        },
+        }
         _ => todo!("Not supported (yet). wp for {:?}", ivl),
     }
 }

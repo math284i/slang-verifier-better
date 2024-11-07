@@ -1,5 +1,3 @@
-use std::collections::btree_set::Union;
-
 use slang::{
     ast::{Expr, Name, Type},
     Span,
@@ -72,9 +70,9 @@ impl IVLCmd {
     }
 
     pub fn return_ivl(expr: &Option<Expr>) -> IVLCmd {
-        if let Some(exprS) = expr {
+        if let Some(expr_s) = expr {
             IVLCmd { 
-                span: exprS.span,  
+                span: expr_s.span,  
                 kind: IVLCmdKind::Return { 
                         expr: expr.clone() 
                 } 
