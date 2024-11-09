@@ -13,6 +13,22 @@ impl slang_ui::Hook for App {
         // Get reference to Z3 solver
         let mut solver = cx.solver()?;
 
+        // Iterate over domain items
+        for d in file.domains() {
+
+            // Iterate over functions
+            for f in d.functions() {
+                let f_smt = f.clone().smt()?;
+                solver.declare_fun(&f_smt)?;
+            }
+
+            // Iterate over axioms
+            for a in d.axioms() {
+                let a_smt = a.clone().expr.smt()?;
+                solver.assert(a_smt.as_bool()?)?;
+            }
+        }
+
         // Iterate methods
         for m in file.methods() {
             // Get method's preconditions;
