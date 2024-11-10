@@ -1,3 +1,0 @@
-method client() {
-    assert true
-}

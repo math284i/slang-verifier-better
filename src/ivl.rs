@@ -17,7 +17,8 @@ pub enum IVLCmdKind {
 
     Assume { condition: Expr },
     Assert { condition: Expr, message: String },
-
+    Return { expr: Option<Expr>},
+    
     Seq(Box<IVLCmd>, Box<IVLCmd>),
     NonDet(Box<IVLCmd>, Box<IVLCmd>),
 }
