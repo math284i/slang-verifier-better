@@ -13,14 +13,27 @@
 // to *fields*, but this does not apply to *predicates*
 predicate time_credit() // represents one abstract unit of time
 
-// models spending an abstract unit of time 
+// models spending an abstract unit of time
 // needs to be called at the beginning of every method
 // and loop iteration
-method consume_time_credit() // 
+method consume_time_credit() //
     requires acc(time_credit(), 1/1)
 // -----------------------------------------
+// function to calculate the n-th Fibonacci number
+function fib(n: Int): Int
+    requires n >= 0
+    ensures result >= 0
+{
+    n <= 1 ? n : fib(n - 1) + fib(n - 2)
+}
 
-
+// compute the required time credits for the fib function
+function fib_time(n: Int): Int
+    requires n >= 0
+    ensures result >= 0
+{
+    n <= 1 ? 1 : fib_time(n - 1) + fib_time(n - 2) + 1
+}
 // -----------------------------------------
 // Task 1: Prove a runtime bound for the following recursive method
 // Your bound should be tight, i.e. use as few time credits
@@ -31,7 +44,9 @@ method consume_time_credit() //
 // Furthermore, make sure that the functional contract remains intact.
 method fib_recursive(n: Int) returns (res: Int)
     requires n >= 0
-    // TODO add time credits and functional specification
+    requires acc(time_credit(), fib_time(n)/1) // require that the method has enough time credits, depending on n
+    ensures res == fib(n) // ensure the functional correctness
+    ensures acc(time_credit(), 0/1) // ensure that all time credits are consumed
 {
     consume_time_credit() // we must spend a credit for every call
 
