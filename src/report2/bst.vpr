@@ -1,0 +1,90 @@
+// -----------------------------------------
+// Runtime model
+// Notice that we can hold at most one permission
+// to *fields*, but this does not apply to *predicates*
+predicate time_credit() // represents one abstract unit of time
+
+// models spending an abstract unit of time 
+// needs to be called at the beginning of every method
+// and loop iteration
+method consume_time_credit() // 
+    requires acc(time_credit(), 1/1)
+// -----------------------------------------
+
+// -----------------------------------------
+// Object model
+// The provided fields are required.
+// You can add additional (ghost) fields
+// if you want
+
+// a BST node
+field elem : Int // value stored in the node
+field left : Ref // left child
+field right : Ref // right child
+
+// Object for the whole BST, which just stores a 
+// pointer to the root node of the tree
+field root: Ref 
+// -----------------------------------------
+
+
+// -----------------------------------------
+// Utility functions, which you may find useful
+function max(a : Int, b : Int) : Int 
+    ensures result >= a && result >= b
+    ensures result == a || result == b
+{
+    a > b ? a : b
+}
+
+function min(a : Int, b : Int) : Int 
+    ensures result <= a && result <= b
+    ensures result == a || result == b
+{
+    a < b ? a : b
+}
+// -----------------------------------------
+
+
+// -----------------------------------------
+// TASK 4.1: Define a predicate for binary search trees and individual BST nodes.
+// You may define additional fields, predicates, arguments or heap-based functions.
+
+// The whole tree has just a reference to the root
+// The empty tree is represented by self.root == null
+predicate bst(self: Ref) // TODO
+
+// A single BST node. Apart from field permissions, the current value
+// must be greater than the largest value in the left subtree and
+// smaller than the smallest value in the right subtree.
+predicate bst_node(self: Ref) // TODO
+// -----------------------------------------
+
+
+// -----------------------------------------
+// TASK 4.2: Define a data abstraction function that maps
+// every BST to the set of values it stores.
+function to_set(tree: Ref): Set[Int] // TODO
+// -----------------------------------------
+
+
+// -----------------------------------------
+// Auxiliary definition of the height of a tree
+function height(tree: Ref) : Int
+    requires bst(tree)
+    // TODO: define for TASK 4.4
+// -----------------------------------------
+
+
+// -----------------------------------------
+// TASK 4.3: Implement the following method and use your predicate ans abstraction function to
+//           prove that the method correctly inserts a value into a BST.
+//           It is OK to ignore time credits for this task, i.e. you do not have to call consume_time_credit().
+
+// TASK 4.4: Show that h+2 time credits suffice to insert a value into a BST, where h is the height of the tree.
+//           For this task, you must call consume_time_credit() at the beginning of every method and for every
+//           loop iteration.
+method bst_insert(tree: Ref, val: Int)
+    requires bst(tree)
+    // TODO
+// -----------------------------------------

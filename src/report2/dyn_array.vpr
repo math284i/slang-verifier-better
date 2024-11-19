@@ -1,0 +1,194 @@
+// -----------------------------------------
+// Runtime model
+// Notice that we can hold at most one permission
+// to *fields*, but this does not apply to *predicates*
+predicate time_credit() // represents one abstract unit of time
+
+// models spending an abstract unit of time 
+// needs to be called at the beginning of every method
+// and loop iteration
+method consume_time_credit() // 
+    requires acc(time_credit(), 1/1)
+// -----------------------------------------
+
+
+// -----------------------------------------
+// Object model
+// You can add ghost fields if you want.
+
+// Fields of dynamic array objects
+field length: Int // how many elements are currently stored in the array
+field capacity: Int // how many elements can be stored in the array
+field array: StaticArray // the static array storing the actual elements, see below
+
+
+// Fields of individual array elements
+field entry: Int // the value of the array element
+// -----------------------------------------
+
+
+// -----------------------------------------
+// Static arrays with field entry as in module 11
+domain StaticArray {
+    function loc(a: StaticArray, i: Int): Ref
+    function len(a: StaticArray): Int
+    function first(r: Ref): StaticArray
+    function second(r: Ref): Int
+
+    axiom injectivity {
+        forall a: StaticArray, i: Int :: {loc(a, i)}
+        first(loc(a, i)) == a && second(loc(a, i)) == i
+    }
+
+    axiom length_nonneg {
+        forall a: StaticArray :: len(a) >= 0
+    }
+}
+// -----------------------------------------
+
+// -----------------------------------------
+// Shortcuts for using static arrays
+
+// a[i] for static array a
+define lookup(a, i)
+    loc(a, i).entry
+
+// a[i] := e for static array a
+define update(a, i, e) { 
+    loc(a, i).entry := e
+}
+
+// Permissions to elements of static array a
+define staticArray(a)
+    (forall i: Int :: {loc(a, i)}  0 <= i && i < len(a) ==> acc(loc(a, i).entry)) 
+
+// Allocate a new static array a of length l
+// You can (reasonably) use this to create a new array
+// Warning: do not use twice with the same arguments.
+define alloc(a, l) {
+    inhale staticArray(a) && len(a) == l
+}
+// -----------------------------------------
+
+
+// -----------------------------------------
+// TASK 3.1: Give a predicate modelling the data structure invariants and permissions
+//         of dynamic arrays. You may also store other (ghost) information
+//         such as time credits needed for amortized analysis.
+//         Feel free to add acessor functions to simplify fold-unfold reasoning.
+predicate dyn_array(self: Ref)
+
+
+// Accessor functions for commonly needed fields
+function arr_length(base: Ref): Int 
+
+// Feel free to also implement acessor or abstraction functions to simplify fold-unfold reasoning.
+// -----------------------------------------
+
+
+// -----------------------------------------
+// TASK 3.2: Implement a proven-correct method that creates a new dynamic array of length 0
+//         with the given capacity.
+//         You should at least prove that your method indeed creates a dynamic array of the 
+//         given capacity that satisfies all data structure invariants of dynamic arrays.
+// Remember to require sufficiently many time credits.
+method cons(_capacity: Int) returns (arr: Ref)
+    requires 0 < _capacity
+{
+    consume_time_credit() // every method call must consume a time credit
+}
+// -----------------------------------------
+
+
+
+// -----------------------------------------
+// TASK 3.3: Define an abstraction function that maps a dynamic array to the 
+//         mathematical sequence of values stored in its elements.
+// For other tasks, you might have to prove additional properties about the abstraction.
+function arr_contents(base: Ref): Seq[Int]
+// -----------------------------------------
+
+
+// -----------------------------------------
+// TASK 3.4: Prove that this method appends the value val to the dynamic array
+//         without increasing the capacity first.
+//         You must prove memory safety and preservation of the dynamic array's data structure invariants.
+//         Furthermore, use your abstraction to prove that val has been correctly appended.
+//         This method can only be called if there is enough space left in the dynamic array.
+//         For amortized analysis, we also want to save a time credit such that we can 
+//         grow the array later if necessary.
+//         You can add specifications and ghost code, but do not modify the production code
+method append_nogrow(arr: Ref, val: Int)
+{
+    consume_time_credit() 
+
+    update(arr.array, arr.length, val) // append value
+    arr.length := arr.length + 1 // we appended an element
+}
+// -----------------------------------------
+
+
+// -----------------------------------------
+// TASK 3.5: Prove that the method grow creates a copy of the given array with
+//         twice the capacity. 
+//         Prove that all data structure invariants are preserved.
+//         Furthermore, prove that the returned array has the right capacity
+//         and that it indeed contains a copy of the original array, i.e. it
+//         represents the same sequence of values.
+//         For amortized analysis, your method may require only a *constant*
+//         number of time credits, i.e. the number of time credits cannot depend
+//         on any variable.
+//         Hint: You may, of course, use additional time credits that have been stored
+//               in your dynamic array for later use.
+method grow(arr: Ref) returns (new_arr: Ref)
+{
+    consume_time_credit() // we must spend a credit for the call
+
+    // create a new dynamic array with twice the capacity
+    new_arr := new(length, capacity, array)
+    new_arr.capacity := 2 * arr.capacity
+    new_arr.length := arr.length
+    alloc(new_arr.array, new_arr.capacity)
+
+    // copy array elements iteratively; in each iteration, we use ghost credits to pay for the iteration
+    // since we modify both the new array and ghost fields of the old array, we need a lot of invariants
+    // to make sure all relevant properties are preserved
+    var pos: Int := 0
+    while (pos < arr_length(new_arr))
+    {
+        consume_time_credit() // we must spend a credit for every iteration
+
+        // copy one element 
+        update(new_arr.array, pos, lookup(arr.array,pos))
+        pos := pos + 1
+    }
+}
+// -----------------------------------------
+
+
+// -----------------------------------------
+// TASK 3.6: Prove that the following general append method
+//         can be executed in *amortized constant time*
+//         for dynamic arrays.
+//         You may require that a certain number of time credits have been saved up
+//         *in the data structure* that you can use for growing the data structure.
+//         Furthermore, prove memory safety, perservation of data structure invariants
+//         and that the method returns an array that correctly appends the value val. 
+method append(arr: Ref, val: Int) returns (new_arr: Ref)
+{
+    consume_time_credit() // we must spend a time credit for the call
+
+    // do we have space left?
+    if (arr.length + 1 == arr.capacity) {
+        // no, we need to grow the array first
+        new_arr := grow(arr)
+        // append element
+        update(new_arr.array, new_arr.length, val)
+        new_arr.length := new_arr.length + 1
+    } else {
+        // yes, we can append without growing the array first
+        new_arr := arr
+        append_nogrow(new_arr, val)
+    }   
+}
+// -----------------------------------------

@@ -1,0 +1,65 @@
+// -----------------------------------------
+// Runtime model
+// Notice that we can hold at most one permission
+// to *fields*, but this does not apply to *predicates*
+predicate time_credit() // represents one abstract unit of time
+
+// models spending an abstract unit of time 
+// needs to be called at the beginning of every method
+// and loop iteration
+method consume_time_credit() // 
+    requires acc(time_credit(), 1/1)
+// -----------------------------------------
+
+
+// -----------------------------------------
+// Mathematical definition of n^e
+function math_pow(n: Int, e: Int): Int
+    requires 0 <= e
+{
+    e == 0 ? 1 : n * math_pow(n, e - 1)
+}
+// -----------------------------------------
+
+// -----------------------------------------
+// You can use this lemma without a proof
+method lemma_pow(b: Int, y: Int) 
+    requires 0 <= y
+    requires y % 2 == 0 // y is even
+    ensures math_pow(b, y) == math_pow(b * b, y / 2)
+// -----------------------------------------
+
+
+// -----------------------------------------
+// Task 2: Prove a runtime bound for the following recursive method
+// Your bound should be tight, i.e. use as few time credits
+// as possible. Furthermore, try to prove that it is not possible
+// to use fewer time credits.
+// Do not modify the given production code. However, feel free to 
+// introduce additional functions, lemma methods or ghost code.
+// Furthermore, make sure that the functional contract remains intact.
+method fast_pow(n: Int, e: Int)
+    returns (res: Int)
+    requires 0 < e
+    // TODO: verify; add time credits and runtime bounds
+    ensures res == math_pow(n, e)
+{
+    consume_time_credit() // we must spend a credit for every call
+
+    var b: Int := n
+    var y: Int := e 
+    res := 1
+
+    while (y > 0)
+    {
+        consume_time_credit() // we must spend a credit for every loop iteration
+
+        if (y % 2 == 1) {
+            res := res * b
+        }
+
+        y := y / 2
+        b := b * b
+    }
+}
+// -----------------------------------------
