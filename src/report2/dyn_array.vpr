@@ -15,6 +15,7 @@ method consume_time_credit() //
 // -----------------------------------------
 // Object model
 // You can add ghost fields if you want.
+field time_credits: Int
 
 // Fields of dynamic array objects
 field length: Int // how many elements are currently stored in the array
@@ -76,11 +77,54 @@ define alloc(a, l) {
 //         of dynamic arrays. You may also store other (ghost) information
 //         such as time credits needed for amortized analysis.
 //         Feel free to add acessor functions to simplify fold-unfold reasoning.
-predicate dyn_array(self: Ref)
+// TASK 3.1 Implementation
+predicate dyn_array(self: Ref) {
+    // Access permissions for fields
+    acc(self.length) && acc(self.capacity) && acc(self.array) &&
+    
+    // Invariant for length and capacity
+    0 <= self.length && self.length <= self.capacity &&
+    0 <= self.capacity &&
+    
+    // Permission for the underlying static array
+    staticArray(self.array) && //Make sure we have access to all element of the array
+    len(self.array) == self.capacity &&
+    
+    // Ghost field storing the remaining time credits
+    acc(self.time_credits) &&
+    self.time_credits >= 0 &&
+    
+    self.time_credits >= self.capacity
+}
+
+
 
 
 // Accessor functions for commonly needed fields
 function arr_length(base: Ref): Int 
+requires acc(dyn_array(base))
+{
+    unfolding dyn_array(base) in base.length
+}
+
+function arr_capacity(base: Ref): Int 
+requires acc(dyn_array(base))
+{
+    unfolding dyn_array(base) in base.capacity
+}
+
+function arr_array(base: Ref): StaticArray 
+requires acc(dyn_array(base))
+{
+    unfolding dyn_array(base) in base.array
+}
+
+function arr_time_credits(base: Ref): Int 
+requires acc(dyn_array(base))
+{
+    unfolding dyn_array(base) in base.time_credits
+}
+
 
 // Feel free to also implement acessor or abstraction functions to simplify fold-unfold reasoning.
 // -----------------------------------------
@@ -93,10 +137,25 @@ function arr_length(base: Ref): Int
 //         given capacity that satisfies all data structure invariants of dynamic arrays.
 // Remember to require sufficiently many time credits.
 method cons(_capacity: Int) returns (arr: Ref)
-    requires 0 < _capacity
+    requires 0 < _capacity 
+    ensures dyn_array(arr)
+    ensures arr_capacity(arr) == _capacity 
+    ensures arr_length(arr) == 0
+    ensures len(arr_array(arr)) == _capacity 
+    ensures acc(arr.time_credits) && arr.time_credits == _capacity 
 {
-    consume_time_credit() // every method call must consume a time credit
+    consume_time_credit() // Consume a time credit for the method call
+
+    // Allocate the dynamic array
+    arr := new(length, capacity, array, time_credits)
+    arr.length := 0 
+    arr.capacity := _capacity 
+    alloc(arr.array, _capacity) // Allocate the static array of the given capacity
+    arr.time_credits := _capacity // Initialize time credits to match the capacity
+
+    inhale dyn_array(arr)
 }
+
 // -----------------------------------------
 
 

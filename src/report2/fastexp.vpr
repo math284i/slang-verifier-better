@@ -29,6 +29,19 @@ method lemma_pow(b: Int, y: Int)
     ensures math_pow(b, y) == math_pow(b * b, y / 2)
 // -----------------------------------------
 
+function div_count(e: Int): Int
+    requires 0 < e
+    ensures result > 0
+{
+    e == 1 ? 1 : 1 + div_count(e / 2)
+}
+
+function bound(e: Int): Int
+    requires e > 0
+    ensures result >= 0
+{
+    e == 1 ? 1 : 1 + bound(e / 2)
+}
 
 // -----------------------------------------
 // Task 2: Prove a runtime bound for the following recursive method
@@ -41,25 +54,36 @@ method lemma_pow(b: Int, y: Int)
 method fast_pow(n: Int, e: Int)
     returns (res: Int)
     requires 0 < e
-    // TODO: verify; add time credits and runtime bounds
+
+    requires acc(time_credit(), 1/1) && acc(time_credit(), (bound(e) + 1)/1) // Allocate time credits
     ensures res == math_pow(n, e)
+    ensures acc(time_credit(), 0/1) // All credits are consumed
 {
-    consume_time_credit() // we must spend a credit for every call
+    consume_time_credit() // 1 credit for method entry
 
     var b: Int := n
-    var y: Int := e 
+    var y: Int := e
     res := 1
 
     while (y > 0)
+    invariant y >= 0
+    invariant y > 0 ==> acc(time_credit(), (bound(y) + 1)/1)
+    decreases y
+    invariant res * math_pow(b, y) == math_pow(n, e) // Functional invariant
     {
-        consume_time_credit() // we must spend a credit for every loop iteration
+        consume_time_credit() // 1 credit per iteration
 
         if (y % 2 == 1) {
             res := res * b
+            lemma_pow(b, y - 1)
+        } else {
+            lemma_pow(b, y)
         }
 
         y := y / 2
         b := b * b
     }
 }
+
+
 // -----------------------------------------
