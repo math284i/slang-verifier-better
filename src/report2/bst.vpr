@@ -52,21 +52,36 @@ function min(a : Int, b : Int) : Int
 
 // The whole tree has just a reference to the root
 // The empty tree is represented by self.root == null
-predicate bst(self: Ref) // TODO
-
+predicate bst(self: Ref)
+{
+    self.root == null || self.root != null
+} 
 // A single BST node. Apart from field permissions, the current value
 // must be greater than the largest value in the left subtree and
 // smaller than the smallest value in the right subtree.
-predicate bst_node(self: Ref) // TODO
-// -----------------------------------------
 
+
+
+predicate bst_node(self: Ref) // TODO
+{
+    self.left == null || ( self.elem == max(self.elem, self.left.elem))
+    &&
+    self.right == null || ( self.elem == min(self.elem, self.right.elem))
+}
 
 // -----------------------------------------
 // TASK 4.2: Define a data abstraction function that maps
-// every BST to the set of values it stores.
-function to_set(tree: Ref): Set[Int] // TODO
+// every BST to the set of values it stores. // TODO
 // -----------------------------------------
+function to_set(tree: Ref): Set[Int]
+{
+    tree.root == null ? Set[Int]() : to_set_node(tree.root)
+}
 
+function to_set_node(node: Ref): Set[Int]
+{
+    node == null ? Set[Int]() : to_set_node(node.left) ++ Set(node.elem)  ++ to_set_node(node.right)
+}
 
 // -----------------------------------------
 // Auxiliary definition of the height of a tree
@@ -88,3 +103,37 @@ method bst_insert(tree: Ref, val: Int)
     requires bst(tree)
     // TODO
 // -----------------------------------------
+
+
+
+
+method test_to_set()
+{
+    var tree: Ref
+    var n1: Ref
+    var n2: Ref
+    // Initialize tree and nodes
+    tree := new()
+    n1 := new()
+    n2 := new()
+
+    n1.elem := 10
+    n1.left := null
+    n1.right := null
+
+    n2.elem := 20
+    n2.left := null
+    n2.right := null
+
+    tree.root := n1
+    n1.right := n2
+
+    // Unfold and assert the to_set result
+    unfold bst(tree)
+    unfold bst_node(n1)
+    unfold bst_node(n2)
+    assert to_set(tree) == Set(10, 20)
+    fold bst_node(n2)
+    fold bst_node(n1)
+    fold bst(tree)
+}
