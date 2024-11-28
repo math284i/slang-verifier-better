@@ -123,25 +123,21 @@ function height(tree: Ref) : Int
 method bst_insert(tree: Ref, val: Int)
     requires acc(bst(tree))
     ensures bst(tree)
-    //ensures to_set(tree) == old(to_set(tree)) union Set(val)
+    ensures to_set(tree) == old(to_set(tree)) union Set(val)
 {
     //consume_time_credit(); // Consume one unit of time at the start of the method
-    unfold bst(tree);
+    unfold bst(tree)
     if (tree.root == null) {
-        // If the tree is empty, create a new node as the root
-        var newNode: Ref := new(elem, left, right);
-        newNode.elem := val;
-        newNode.left := null;
-        newNode.right := null;
-        //fold bst_node(newNode);
-        tree.root := newNode;
-        fold bst_node(tree.root);
-        //inhale acc(tree.root, 1/1);
-        fold bst(tree);
+        var newNode: Ref := new(elem, left, right)
+        newNode.elem := val
+        newNode.left := null
+        newNode.right := null
+        tree.root := newNode
+        fold bst_node(tree.root)
     } else {
-        bst_insert_node(tree.root, val);
-        fold bst(tree);
+        bst_insert_node(tree.root, val)
     }
+    fold bst(tree)
 }
 
 
@@ -161,11 +157,8 @@ method bst_insert_node(node: Ref, val: Int)
             newNode.right := null
             node.left := newNode
             fold bst_node(node.left)
-            fold bst_node(node)
         } else {
             bst_insert_node(node.left, val)
-            //fold bst_node(node.left)
-            fold bst_node(node)
         }
     } elseif (val > node.elem) {
         if (node.right == null) {
@@ -175,15 +168,11 @@ method bst_insert_node(node: Ref, val: Int)
             newNode.right := null
             node.right := newNode
             fold bst_node(node.right)
-            fold bst_node(node)
         } else {
             bst_insert_node(node.right, val)
-            fold bst_node(node)
         }
     }
-    else {
-        fold bst_node(node)
-    }
+    fold bst_node(node)
 }
 
 
