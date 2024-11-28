@@ -182,12 +182,16 @@ function arr_contents_helper(base: StaticArray, index: Int, arrayLength: Int): S
     requires index <= arrayLength
     requires index >= 0
     ensures |result| == arrayLength - index
+    ensures forall i: Int ::
+        0 <= i && (i + index) < (arrayLength) ==> result[i] == lookup(base, i + index)
 {
     index < arrayLength ? Seq(lookup(base, index)) ++ arr_contents_helper(base, index + 1, arrayLength) : Seq[Int]()
 }
 
 function arr_contents(base: Ref): Seq[Int]
     requires dyn_array(base)
+    ensures arr_length(base) >= 0
+    ensures arr_length(base) <= arr_capacity(base)
     ensures |result| == arr_length(base)
     // ensures forall i: Int ::
     //     0 <= i && i < |result| ==> result[i] == lookup(arr_array(base), i)
@@ -220,7 +224,8 @@ method append_nogrow(arr: Ref, val: Int)
     ensures arr_contents(arr) == old(arr_contents(arr)) ++ Seq(val)
 {
     consume_time_credit() // Consume time credit for the operation
-    
+    unfold dyn_array(arr)
+
     update(arr.array, arr.length, val) // Update the static array
     arr.length := arr.length + 1 // Increment the length
 
