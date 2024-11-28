@@ -103,7 +103,7 @@ function to_set_node(node: Ref): Set[Int]
 {
     unfolding bst_node(node) in (node == null
         ? Set[Int]() 
-        : to_set_node(node.left) union Set(node.elem) union to_set_node(node.right))
+        : (node.left == null ? Set[Int]() : to_set_node(node.left)) union Set(node.elem) union (node.right == null ? Set[Int]() : to_set_node(node.right)))
 }
 
 
@@ -139,6 +139,7 @@ method bst_insert(tree: Ref, val: Int)
         newNode.right := null;
         tree.root := newNode;
         fold bst_node(tree.root);
+        fold bst_node(newNode.left);
     } else {
         bst_insert_node(tree.root, val);
 
