@@ -57,11 +57,12 @@ predicate bst(self: Ref) {
 
     //acc(self, 1/1) &&
     acc(self.root, 1/1) &&
-    acc(self.elem, 1/1) &&
-    acc(self.left, 1/1) && acc(self.right, 1/1) &&
+    (self.root != null ==> (
+    acc(self.left, 1/1) &&
+    acc(self.right, 1/1) &&
     (self.left != null ==> bst(self.left)) &&
     (self.right != null ==> bst(self.right)) &&
-    (bst_node(self.root))
+    (bst_node(self.root))))
 }
 
 // A single BST node. Apart from field permissions, the current value
@@ -76,14 +77,14 @@ predicate bst_node(self: Ref) {
     acc(self.right, 1/1) &&
     (
         // Ensure the left subtree's elements are less than the node's value
-        (bst_node(self.left)) &&
+        (self.left != null ==> (bst_node(self.left)) &&
         forall l: Int :: l in to_set_node(self.left) ==> l < self.elem
-    ) &&
+    )) &&
     (
         // Ensure the right subtree's elements are greater than the node's value
-        (bst_node(self.right)) &&
+        (self.right != null ==> (bst_node(self.right)) &&
         forall r: Int :: r in to_set_node(self.right) ==> r > self.elem
-    )
+    ))
 }
 
 
@@ -102,7 +103,7 @@ function to_set_node(node: Ref): Set[Int]
 {
     unfolding bst_node(node) in (node == null
         ? Set[Int]() 
-        : to_set_node(node.left) union Set(node.elem) union to_set_node(node.right))
+        : (node.left == null ? Set[Int]() : to_set_node(node.left)) union Set(node.elem) union (node.right == null ? Set[Int]() : to_set_node(node.right)))
 }
 
 
@@ -124,6 +125,64 @@ function height(tree: Ref) : Int
 //           For this task, you must call consume_time_credit() at the beginning of every method and for every
 //           loop iteration.
 method bst_insert(tree: Ref, val: Int)
-    requires bst(tree)
-    // TODO
-// -----------------------------------------
+    requires acc(bst(tree))
+    ensures bst(tree)
+    //ensures to_set(tree) == old(to_set(tree)) union Set(val)
+{
+    //consume_time_credit(); // Consume one unit of time at the start of the method
+    unfold bst(tree);
+    if (tree.root == null) {
+        // If the tree is empty, create a new node as the root
+        var newNode: Ref := new(elem, left, right);
+        newNode.elem := val;
+        newNode.left := null;
+        newNode.right := null;
+        tree.root := newNode;
+        fold bst_node(tree.root);
+        fold bst_node(newNode.left);
+    } else {
+        bst_insert_node(tree.root, val);
+
+    }
+    fold bst(tree);
+}
+
+
+
+method bst_insert_node(node: Ref, val: Int)
+    requires acc(bst_node(node))
+    ensures bst_node(node)
+    //ensures to_set_node(node) == old(to_set_node(node)) union Set(val)
+{
+    //consume_time_credit(); // Consume one unit of time for entering the method
+    unfold bst_node(node);
+    if (val < node.elem) {
+        if (node.left == null) {
+            var newNode: Ref := new(elem, left, right);
+            newNode.elem := val;
+            newNode.left := null;
+            newNode.right := null;
+            node.left := newNode;
+            fold bst_node(node.left)
+        } else {
+            bst_insert_node(node.left, val);
+        }
+    } elseif (val > node.elem) {
+        if (node.right == null) {
+            var newNode: Ref := new(elem, left, right);
+            newNode.elem := val;
+            newNode.left := null;
+            newNode.right := null;
+            node.right := newNode;
+            fold bst_node(node.right)
+        } else {
+            bst_insert_node(node.right, val);
+
+        }
+    }
+    fold bst_node(node);
+}
+
+
+
+
