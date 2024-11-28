@@ -124,6 +124,60 @@ function height(tree: Ref) : Int
 //           For this task, you must call consume_time_credit() at the beginning of every method and for every
 //           loop iteration.
 method bst_insert(tree: Ref, val: Int)
-    requires bst(tree)
-    // TODO
-// -----------------------------------------
+    requires acc(bst(tree))
+    ensures bst(tree)
+    ensures to_set(tree) == old(to_set(tree)) union Set(val)
+{
+    //consume_time_credit() // Consume one unit of time at the start of the method
+
+    if (tree.root == null) {
+        // If the tree is empty, create a new node as the root
+        var newNode: Ref := new() 
+        inhale acc(newNode.elem, 1/1)
+        inhale acc(newNode.left, 1/1)
+        inhale acc(newNode.right, 1/1)
+        newNode.elem := val
+        newNode.left := null
+        newNode.right := null
+        tree.root := newNode
+    } else {
+        // Insert the value into the tree starting from the root
+        bst_insert_node(tree.root, val)
+    }
+}
+
+method bst_insert_node(node: Ref, val: Int)
+    requires bst_node(node)
+    ensures bst_node(node)
+    //ensures to_set_node(node) == old(to_set_node(node)) union Set(val)
+{
+    //consume_time_credit() // Consume time credit for entering this recursive function
+
+    if (val < node.elem) {
+        if (node.left == null) {
+            var newNode: Ref := new()
+            inhale acc(newNode.elem, 1/1)
+            inhale acc(newNode.left, 1/1)
+            inhale acc(newNode.right, 1/1)
+            newNode.elem := val
+            newNode.left := null
+            newNode.right := null
+            node.left := newNode
+        } else {
+            bst_insert_node(node.left, val)
+        }
+    } if (val > node.elem) {
+        if (node.right == null) {
+            var newNode: Ref := new()
+            inhale acc(newNode.elem, 1/1)
+            inhale acc(newNode.left, 1/1)
+            inhale acc(newNode.right, 1/1)
+            newNode.elem := val
+            newNode.left := null
+            newNode.right := null
+            node.right := newNode
+        } else {
+            bst_insert_node(node.right, val)
+        }
+    }
+}
