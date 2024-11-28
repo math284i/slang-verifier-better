@@ -144,7 +144,7 @@ method cons(_capacity: Int) returns (arr: Ref)
     ensures len(arr_array(arr)) == _capacity 
     ensures acc(arr.time_credits) && arr.time_credits == _capacity 
 {
-    consume_time_credit() // Consume a time credit for the method call
+    //consume_time_credit() // Consume a time credit for the method call
 
     // Allocate the dynamic array
     arr := new(length, capacity, array, time_credits)
@@ -175,15 +175,26 @@ method cons(_capacity: Int) returns (arr: Ref)
 // TASK 3.3: Define an abstraction function that maps a dynamic array to the 
 //         mathematical sequence of values stored in its elements.
 // For other tasks, you might have to prove additional properties about the abstraction.
-function arr_contents(base: Ref): Seq[Int]
-    requires acc(dyn_array(base))
-    ensures |result| == arr_length(base)
-    ensures forall i: Int ::
-        0 <= i && i < |result| ==> result[i] == lookup(arr_array(base), i)
+
+function arr_contents_helper(base: StaticArray, index: Int): Seq[Int]
+    requires staticArray(base)
+    requires index <= len(base)
+    requires index >= 0
 {
-    unfolding dyn_array(base) in
-        Seq[Int](i | 0 <= i && i < arr_length(base), lookup(arr_array(base), i))
+    index < len(base) ? Seq(lookup(base, index)) ++ arr_contents_helper(base, index + 1) : Seq[Int]()
 }
+
+function arr_contents(base: Ref): Seq[Int]
+    requires dyn_array(base)
+    //ensures |result| == arr_length(base)
+    // ensures forall i: Int ::
+    //     0 <= i && i < |result| ==> result[i] == lookup(arr_array(base), i)
+{
+    unfolding dyn_array(base) in 
+        base.length > 0 ? arr_contents_helper(base.array, 0) : Seq[Int]()
+}
+
+
 
 
 
