@@ -176,22 +176,24 @@ method cons(_capacity: Int) returns (arr: Ref)
 //         mathematical sequence of values stored in its elements.
 // For other tasks, you might have to prove additional properties about the abstraction.
 
-function arr_contents_helper(base: StaticArray, index: Int): Seq[Int]
+function arr_contents_helper(base: StaticArray, index: Int, arrayLength: Int): Seq[Int]
     requires staticArray(base)
-    requires index <= len(base)
+    requires arrayLength <= len(base)
+    requires index <= arrayLength
     requires index >= 0
+    ensures |result| == arrayLength - index
 {
-    index < len(base) ? Seq(lookup(base, index)) ++ arr_contents_helper(base, index + 1) : Seq[Int]()
+    index < arrayLength ? Seq(lookup(base, index)) ++ arr_contents_helper(base, index + 1, arrayLength) : Seq[Int]()
 }
 
 function arr_contents(base: Ref): Seq[Int]
     requires dyn_array(base)
-    //ensures |result| == arr_length(base)
+    ensures |result| == arr_length(base)
     // ensures forall i: Int ::
     //     0 <= i && i < |result| ==> result[i] == lookup(arr_array(base), i)
 {
     unfolding dyn_array(base) in 
-        base.length > 0 ? arr_contents_helper(base.array, 0) : Seq[Int]()
+        base.length > 0 ? arr_contents_helper(base.array, 0, base.length) : Seq[Int]()
 }
 
 
@@ -211,12 +213,20 @@ function arr_contents(base: Ref): Seq[Int]
 //         grow the array later if necessary.
 //         You can add specifications and ghost code, but do not modify the production code
 method append_nogrow(arr: Ref, val: Int)
+    requires dyn_array(arr)
+    requires arr_length(arr) < arr_capacity(arr)
+    requires acc(time_credit(), 1/1)
+    ensures dyn_array(arr) 
+    ensures arr_contents(arr) == old(arr_contents(arr)) ++ Seq(val)
 {
-    consume_time_credit() 
+    consume_time_credit() // Consume time credit for the operation
+    
+    update(arr.array, arr.length, val) // Update the static array
+    arr.length := arr.length + 1 // Increment the length
 
-    update(arr.array, arr.length, val) // append value
-    arr.length := arr.length + 1 // we appended an element
+    fold dyn_array(arr)
 }
+
 // -----------------------------------------
 
 
