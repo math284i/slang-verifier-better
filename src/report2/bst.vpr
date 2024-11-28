@@ -61,7 +61,7 @@ predicate bst(self: Ref) {
     acc(self.left, 1/1) && acc(self.right, 1/1) &&
     (self.left != null ==> bst(self.left)) &&
     (self.right != null ==> bst(self.right)) &&
-    (bst_node(self))
+    (bst_node(self.root))
 }
 
 // A single BST node. Apart from field permissions, the current value
@@ -94,15 +94,15 @@ predicate bst_node(self: Ref) {
 function to_set(tree: Ref): Set[Int]
     requires acc(bst(tree))
 {
-    tree.root == null ? Set[Int]() : to_set_node(tree.root)
+    unfolding bst(tree) in (tree.root == null ? Set[Int]() : to_set_node(tree.root))
 }
 
 function to_set_node(node: Ref): Set[Int]
     requires acc(bst_node(node))
 {
-    node == null
+    unfolding bst_node(node) in (node == null
         ? Set[Int]() 
-        : to_set_node(node.left) union Set(node.elem) union to_set_node(node.right)
+        : to_set_node(node.left) union Set(node.elem) union to_set_node(node.right))
 }
 
 
