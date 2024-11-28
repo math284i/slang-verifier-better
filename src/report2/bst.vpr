@@ -58,10 +58,6 @@ predicate bst(self: Ref) {
     //acc(self, 1/1) &&
     acc(self.root, 1/1) &&
     (self.root != null ==> (
-    acc(self.left, 1/1) &&
-    acc(self.right, 1/1) &&
-    (self.left != null ==> bst(self.left)) &&
-    (self.right != null ==> bst(self.right)) &&
     (bst_node(self.root))))
 }
 
@@ -137,14 +133,15 @@ method bst_insert(tree: Ref, val: Int)
         newNode.elem := val;
         newNode.left := null;
         newNode.right := null;
+        //fold bst_node(newNode);
         tree.root := newNode;
         fold bst_node(tree.root);
-        fold bst_node(newNode.left);
+        //inhale acc(tree.root, 1/1);
+        fold bst(tree);
     } else {
         bst_insert_node(tree.root, val);
-
+        fold bst(tree);
     }
-    fold bst(tree);
 }
 
 
@@ -152,35 +149,41 @@ method bst_insert(tree: Ref, val: Int)
 method bst_insert_node(node: Ref, val: Int)
     requires acc(bst_node(node))
     ensures bst_node(node)
-    //ensures to_set_node(node) == old(to_set_node(node)) union Set(val)
+    ensures to_set_node(node) == old(to_set_node(node)) union Set(val)
 {
     //consume_time_credit(); // Consume one unit of time for entering the method
-    unfold bst_node(node);
+    unfold bst_node(node)
     if (val < node.elem) {
         if (node.left == null) {
-            var newNode: Ref := new(elem, left, right);
-            newNode.elem := val;
-            newNode.left := null;
-            newNode.right := null;
-            node.left := newNode;
+            var newNode: Ref := new(elem, left, right)
+            newNode.elem := val
+            newNode.left := null
+            newNode.right := null
+            node.left := newNode
             fold bst_node(node.left)
+            fold bst_node(node)
         } else {
-            bst_insert_node(node.left, val);
+            bst_insert_node(node.left, val)
+            //fold bst_node(node.left)
+            fold bst_node(node)
         }
     } elseif (val > node.elem) {
         if (node.right == null) {
-            var newNode: Ref := new(elem, left, right);
-            newNode.elem := val;
-            newNode.left := null;
-            newNode.right := null;
-            node.right := newNode;
+            var newNode: Ref := new(elem, left, right)
+            newNode.elem := val
+            newNode.left := null
+            newNode.right := null
+            node.right := newNode
             fold bst_node(node.right)
+            fold bst_node(node)
         } else {
-            bst_insert_node(node.right, val);
-
+            bst_insert_node(node.right, val)
+            fold bst_node(node)
         }
     }
-    fold bst_node(node);
+    else {
+        fold bst_node(node)
+    }
 }
 
 
