@@ -58,10 +58,6 @@ predicate bst(self: Ref) {
     //acc(self, 1/1) &&
     acc(self.root, 1/1) &&
     (self.root != null ==> (
-    acc(self.left, 1/1) &&
-    acc(self.right, 1/1) &&
-    (self.left != null ==> bst(self.left)) &&
-    (self.right != null ==> bst(self.right)) &&
     (bst_node(self.root))))
 }
 
@@ -111,7 +107,24 @@ function to_set_node(node: Ref): Set[Int]
 // -----------------------------------------
 // Auxiliary definition of the height of a tree
 function height(tree: Ref) : Int
-    requires bst(tree)
+    requires acc(bst(tree))
+    ensures result >= 0
+{
+    unfolding bst(tree) in 
+        (tree.root == null ? 0 : height_node(tree.root))
+}
+
+function height_node(node: Ref) : Int
+    requires bst_node(node)
+    ensures result >= 0
+{
+    unfolding bst_node(node) in 
+        max(
+            (node.left == null ? 0 : height_node(node.left)),
+            (node.right == null ? 0 : height_node(node.right))
+        ) + 1
+}
+
     // TODO: define for TASK 4.4
 // -----------------------------------------
 
@@ -126,61 +139,59 @@ function height(tree: Ref) : Int
 //           loop iteration.
 method bst_insert(tree: Ref, val: Int)
     requires acc(bst(tree))
+    requires acc(time_credit(), (height(tree)+1)/1)
     ensures bst(tree)
-    //ensures to_set(tree) == old(to_set(tree)) union Set(val)
+    ensures to_set(tree) == old(to_set(tree)) union Set(val)
 {
-    //consume_time_credit(); // Consume one unit of time at the start of the method
-    unfold bst(tree);
+    consume_time_credit(); // Consume one unit of time at the start of the method
+    unfold bst(tree)
     if (tree.root == null) {
-        // If the tree is empty, create a new node as the root
-        var newNode: Ref := new(elem, left, right);
-        newNode.elem := val;
-        newNode.left := null;
-        newNode.right := null;
-        tree.root := newNode;
-        fold bst_node(tree.root);
-        fold bst_node(newNode.left);
+        var newNode: Ref := new(elem, left, right)
+        newNode.elem := val
+        newNode.left := null
+        newNode.right := null
+        tree.root := newNode
+        fold bst_node(tree.root)
     } else {
-        bst_insert_node(tree.root, val);
-
+        bst_insert_node(tree.root, val)
     }
-    fold bst(tree);
+    fold bst(tree)
 }
 
 
 
 method bst_insert_node(node: Ref, val: Int)
     requires acc(bst_node(node))
+    requires acc(time_credit(), (height_node(node)/1))
     ensures bst_node(node)
-    //ensures to_set_node(node) == old(to_set_node(node)) union Set(val)
+    ensures to_set_node(node) == old(to_set_node(node)) union Set(val)
 {
-    //consume_time_credit(); // Consume one unit of time for entering the method
-    unfold bst_node(node);
+    consume_time_credit(); // Consume one unit of time for entering the method
+    unfold bst_node(node)
     if (val < node.elem) {
         if (node.left == null) {
-            var newNode: Ref := new(elem, left, right);
-            newNode.elem := val;
-            newNode.left := null;
-            newNode.right := null;
-            node.left := newNode;
+            var newNode: Ref := new(elem, left, right)
+            newNode.elem := val
+            newNode.left := null
+            newNode.right := null
+            node.left := newNode
             fold bst_node(node.left)
         } else {
-            bst_insert_node(node.left, val);
+            bst_insert_node(node.left, val)
         }
     } elseif (val > node.elem) {
         if (node.right == null) {
-            var newNode: Ref := new(elem, left, right);
-            newNode.elem := val;
-            newNode.left := null;
-            newNode.right := null;
-            node.right := newNode;
+            var newNode: Ref := new(elem, left, right)
+            newNode.elem := val
+            newNode.left := null
+            newNode.right := null
+            node.right := newNode
             fold bst_node(node.right)
         } else {
-            bst_insert_node(node.right, val);
-
+            bst_insert_node(node.right, val)
         }
     }
-    fold bst_node(node);
+    fold bst_node(node)
 }
 
 
