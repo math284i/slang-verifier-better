@@ -107,7 +107,24 @@ function to_set_node(node: Ref): Set[Int]
 // -----------------------------------------
 // Auxiliary definition of the height of a tree
 function height(tree: Ref) : Int
-    requires bst(tree)
+    requires acc(bst(tree))
+    ensures result >= 0
+{
+    unfolding bst(tree) in 
+        (tree.root == null ? 0 : height_node(tree.root))
+}
+
+function height_node(node: Ref) : Int
+    requires bst_node(node)
+    ensures result >= 0
+{
+    unfolding bst_node(node) in 
+        max(
+            (node.left == null ? 0 : height_node(node.left)),
+            (node.right == null ? 0 : height_node(node.right))
+        ) + 1
+}
+
     // TODO: define for TASK 4.4
 // -----------------------------------------
 
@@ -122,10 +139,11 @@ function height(tree: Ref) : Int
 //           loop iteration.
 method bst_insert(tree: Ref, val: Int)
     requires acc(bst(tree))
+    requires acc(time_credit(), (height(tree)+1)/1)
     ensures bst(tree)
     ensures to_set(tree) == old(to_set(tree)) union Set(val)
 {
-    //consume_time_credit(); // Consume one unit of time at the start of the method
+    consume_time_credit(); // Consume one unit of time at the start of the method
     unfold bst(tree)
     if (tree.root == null) {
         var newNode: Ref := new(elem, left, right)
@@ -144,10 +162,11 @@ method bst_insert(tree: Ref, val: Int)
 
 method bst_insert_node(node: Ref, val: Int)
     requires acc(bst_node(node))
+    requires acc(time_credit(), (height_node(node)/1))
     ensures bst_node(node)
     ensures to_set_node(node) == old(to_set_node(node)) union Set(val)
 {
-    //consume_time_credit(); // Consume one unit of time for entering the method
+    consume_time_credit(); // Consume one unit of time for entering the method
     unfold bst_node(node)
     if (val < node.elem) {
         if (node.left == null) {
