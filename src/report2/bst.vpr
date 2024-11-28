@@ -54,8 +54,14 @@ function min(a : Int, b : Int) : Int
 // The empty tree is represented by self.root == null
 
 predicate bst(self: Ref) {
-    acc(self.root, 1/1) && 
-    (bst_node(self.root)) // Ensure recursive structure is respected.
+
+    //acc(self, 1/1) &&
+    acc(self.root, 1/1) &&
+    acc(self.elem, 1/1) &&
+    acc(self.left, 1/1) && acc(self.right, 1/1) &&
+    (self.left != null ==> bst(self.left)) &&
+    (self.right != null ==> bst(self.right)) &&
+    (bst_node(self))
 }
 
 // A single BST node. Apart from field permissions, the current value
