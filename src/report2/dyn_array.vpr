@@ -193,8 +193,6 @@ function arr_contents(base: Ref): Seq[Int]
     ensures arr_length(base) >= 0
     ensures arr_length(base) <= arr_capacity(base)
     ensures |result| == arr_length(base)
-    // ensures forall i: Int ::
-    //     0 <= i && i < |result| ==> result[i] == lookup(arr_array(base), i)
 {
     unfolding dyn_array(base) in 
         base.length > 0 ? arr_contents_helper(base.array, 0, base.length) : Seq[Int]()
@@ -223,11 +221,11 @@ method append_nogrow(arr: Ref, val: Int)
     ensures dyn_array(arr) 
     ensures arr_contents(arr) == old(arr_contents(arr)) ++ Seq(val)
 {
-    consume_time_credit() // Consume time credit for the operation
+    consume_time_credit()
     unfold dyn_array(arr)
 
-    update(arr.array, arr.length, val) // Update the static array
-    arr.length := arr.length + 1 // Increment the length
+    update(arr.array, arr.length, val) // append value
+    arr.length := arr.length + 1 // we appended an element
 
     fold dyn_array(arr)
 }
