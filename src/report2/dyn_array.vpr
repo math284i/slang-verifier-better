@@ -77,7 +77,6 @@ define alloc(a, l) {
 //         of dynamic arrays. You may also store other (ghost) information
 //         such as time credits needed for amortized analysis.
 //         Feel free to add acessor functions to simplify fold-unfold reasoning.
-// TASK 3.1 Implementation
 predicate dyn_array(self: Ref) {
     // Access permissions for fields
     acc(self.length) && acc(self.capacity) && acc(self.array) &&
@@ -96,9 +95,6 @@ predicate dyn_array(self: Ref) {
     
     self.time_credits >= self.capacity
 }
-
-
-
 
 // Accessor functions for commonly needed fields
 function arr_length(base: Ref): Int 
@@ -124,8 +120,6 @@ requires acc(dyn_array(base))
 {
     unfolding dyn_array(base) in base.time_credits
 }
-
-
 // Feel free to also implement acessor or abstraction functions to simplify fold-unfold reasoning.
 // -----------------------------------------
 
@@ -137,14 +131,15 @@ requires acc(dyn_array(base))
 //         given capacity that satisfies all data structure invariants of dynamic arrays.
 // Remember to require sufficiently many time credits.
 method cons(_capacity: Int) returns (arr: Ref)
-    requires 0 <= _capacity 
+    requires 0 < _capacity
+    requires acc(time_credit(), 1/1)
     ensures dyn_array(arr)
     ensures arr_capacity(arr) == _capacity 
     ensures arr_length(arr) == 0
     ensures len(arr_array(arr)) == _capacity 
     ensures acc(arr.time_credits) && arr.time_credits == _capacity 
 {
-    //consume_time_credit() // Consume a time credit for the method call
+    consume_time_credit() // every method call must consume a time credit
 
     // Allocate the dynamic array
     arr := new(length, capacity, array, time_credits)
@@ -165,8 +160,6 @@ method cons(_capacity: Int) returns (arr: Ref)
 
     fold dyn_array(arr) // Fold the predicate
 }
-
-
 // -----------------------------------------
 
 
@@ -175,7 +168,6 @@ method cons(_capacity: Int) returns (arr: Ref)
 // TASK 3.3: Define an abstraction function that maps a dynamic array to the 
 //         mathematical sequence of values stored in its elements.
 // For other tasks, you might have to prove additional properties about the abstraction.
-
 function arr_contents_helper(base: StaticArray, index: Int, arrayLength: Int): Seq[Int]
     requires staticArray(base)
     requires arrayLength <= len(base)
@@ -193,17 +185,10 @@ function arr_contents(base: Ref): Seq[Int]
     ensures arr_length(base) >= 0
     ensures arr_length(base) <= arr_capacity(base)
     ensures |result| == arr_length(base)
-    // ensures forall i: Int ::
-    //     0 <= i && i < |result| ==> result[i] == lookup(arr_array(base), i)
 {
     unfolding dyn_array(base) in 
         base.length > 0 ? arr_contents_helper(base.array, 0, base.length) : Seq[Int]()
 }
-
-
-
-
-
 // -----------------------------------------
 
 
@@ -223,15 +208,14 @@ method append_nogrow(arr: Ref, val: Int)
     ensures dyn_array(arr) 
     ensures arr_contents(arr) == old(arr_contents(arr)) ++ Seq(val)
 {
-    consume_time_credit() // Consume time credit for the operation
+    consume_time_credit()
     unfold dyn_array(arr)
 
-    update(arr.array, arr.length, val) // Update the static array
-    arr.length := arr.length + 1 // Increment the length
+    update(arr.array, arr.length, val) // append value
+    arr.length := arr.length + 1 // we appended an element
 
     fold dyn_array(arr)
 }
-
 // -----------------------------------------
 
 
