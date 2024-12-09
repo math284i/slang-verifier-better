@@ -55,6 +55,7 @@ impl slang_ui::Hook for App {
             for (e,s) in swp(&ivl, &post_condition, &mut existing_names){
 
                 // Convert obligation to SMT expression
+                println!("Expr: {:?}", e);
                 let soblig = e.smt()?;
 
                 // Run the following solver-related statements in a closed scope.
@@ -125,17 +126,19 @@ fn cmd_to_ivlcmd(
             Ok(IVLCmd::nondets(&cases))
         }
         CmdKind::Return { expr } => {
-            let mut ivl_cmds = Vec::new();
+            let mut ivl_cmd = IVLCmd::return_ivl(expr);
+            ivl_cmd.span = cmd.span.clone(); 
 
-            for (post_expr, msg) in post_condition.iter() {
-                ivl_cmds.push(IVLCmd::assert(post_expr, msg));
+            let mut seq = IVLCmd::seq(
+                &ivl_cmd,
+                &IVLCmd::assert(&post_condition[0].0, &post_condition[0].1),
+            );
+        
+            for i in 1..post_condition.len() {
+                seq = IVLCmd::seq(&seq, &IVLCmd::assert(&post_condition[i].0, &post_condition[i].1));
             }
 
-            ivl_cmds.push(IVLCmd::return_ivl(expr));
-
-            ivl_cmds.push(IVLCmd::assume(&Expr::bool(false)));
-
-            Ok(IVLCmd::seqs(&ivl_cmds))
+            Ok(IVLCmd::seq(&seq, &IVLCmd::assume(&Expr::bool(false))))
         }
         CmdKind::Loop {
             invariants, body, ..} => {
