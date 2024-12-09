@@ -47,7 +47,7 @@ impl slang_ui::Hook for App {
   
             let posts = m.ensures();
 
-            let post_condition:Vec<(Expr, String)> = posts.map(|expr| (expr.clone(), "Error of post".to_string())).collect();
+            let post_condition:Vec<(Expr, String)> = posts.map(|expr| (expr.clone(), "Post condition doesn't hold".to_string())).collect();
             
             let ivl = cmd_to_ivlcmd(cmd, &post_condition)?;
             let mut existing_names = HashSet::new();
