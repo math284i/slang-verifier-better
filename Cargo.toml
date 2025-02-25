@@ -9,6 +9,7 @@ itertools = "0.13.0"
 regex = "1.10.6"
 slang-ui = { git = "https://github.com/oembo-sse/slang" }
 tokio = { version = "1.40.0", features = ["full"] }
+axum = { git = "https://github.com/tokio-rs/axum", rev = "axum-v0.7.9" }
 
 [[test]]
 name = "tests"
