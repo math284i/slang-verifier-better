@@ -1,11 +1,10 @@
 // Passing example:
 method sumn(n: Int): Int
     requires n >= 0
-    ensures result == n * (n + 1) / 2
 {
     var acc: Int := 0;
     var i: Int := 0;
-    loop
+    loop 
         invariant i >= 0
         invariant i <= n
         invariant acc == i * (i + 1) / 2
@@ -16,7 +15,7 @@ method sumn(n: Int): Int
     };
     assert i == n;
     assert acc == n * (n + 1) / 2;
-
+    assert false;
     return acc
 }
 

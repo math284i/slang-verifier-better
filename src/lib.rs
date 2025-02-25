@@ -113,16 +113,16 @@ fn cmd_to_ivlcmd(
         }
         CmdKind::Assignment { name, expr } => {
             
-            /* if let ExprKind::Infix(_, Op::Div, rhs) = &expr.kind {
+             if let ExprKind::Infix(_, Op::Div, rhs) = &expr.kind {
                 // Insert an assert to check that the divisor is not zero
                 let div_by_zero_check = IVLCmd::assert(
                     &Expr::new_typed( ExprKind::Infix(rhs.clone(), Op::Ne, Box::new(Expr::num(0))), expr.ty.clone()),
                     "Division by zero detected",
                 );
                 Ok(IVLCmd::seq(&div_by_zero_check, &IVLCmd::assign(name, expr)))
-            } else { */
+            } else { 
                 Ok(IVLCmd::assign(name, expr))
-            //}
+            }
         },
         CmdKind::Match { body } => {
             let mut cases: Vec<IVLCmd> = vec![];
