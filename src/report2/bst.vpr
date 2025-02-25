@@ -156,6 +156,7 @@ method bst_insert(tree: Ref, val: Int)
         bst_insert_node(tree.root, val)
     }
     fold bst(tree)
+    assert perm(time_credit()) == 0/1 //Assuring exactly all time_credits has been used.
 }
 
 
@@ -165,6 +166,7 @@ method bst_insert_node(node: Ref, val: Int)
     requires acc(time_credit(), (height_node(node)/1))
     ensures bst_node(node)
     ensures to_set_node(node) == old(to_set_node(node)) union Set(val)
+    
 {
     consume_time_credit(); // Consume one unit of time for entering the method
     unfold bst_node(node)

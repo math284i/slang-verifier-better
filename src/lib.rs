@@ -2,10 +2,9 @@ pub mod ivl;
 mod ivl_ext;
 
 use ivl::{IVLCmd, IVLCmdKind};
-use slang::ast::{Cmd, CmdKind, Expr, Ident};
+use slang::ast::{Cmd, CmdKind, Expr, Ident,PrefixOp,ExprKind,Op};
 use slang_ui::prelude::*;
 use std::collections::HashSet;
-
 pub struct App;
 
 impl slang_ui::Hook for App {
@@ -21,7 +20,6 @@ impl slang_ui::Hook for App {
                 let f_smt = f.clone().smt()?;
                 solver.declare_fun(&f_smt)?;
             }
-
             // Iterate over axioms
             for a in d.axioms() {
                 let a_smt = a.clone().expr.smt()?;
@@ -53,7 +51,7 @@ impl slang_ui::Hook for App {
             let mut existing_names = HashSet::new();
 
             for (e,s) in swp(&ivl, &post_condition, &mut existing_names){
-
+                println!("{e}");
                 // Convert obligation to SMT expression
                 let soblig = e.smt()?;
 
@@ -79,7 +77,6 @@ impl slang_ui::Hook for App {
                 })?;
             }
         }
-
         Ok(())
     }
 }
@@ -114,7 +111,19 @@ fn cmd_to_ivlcmd(
                 Ok(IVLCmd::havoc(name, &ty.1))
             }
         }
-        CmdKind::Assignment { name, expr } => Ok(IVLCmd::assign(name, expr)),
+        CmdKind::Assignment { name, expr } => {
+            
+            /* if let ExprKind::Infix(_, Op::Div, rhs) = &expr.kind {
+                // Insert an assert to check that the divisor is not zero
+                let div_by_zero_check = IVLCmd::assert(
+                    &Expr::new_typed( ExprKind::Infix(rhs.clone(), Op::Ne, Box::new(Expr::num(0))), expr.ty.clone()),
+                    "Division by zero detected",
+                );
+                Ok(IVLCmd::seq(&div_by_zero_check, &IVLCmd::assign(name, expr)))
+            } else { */
+                Ok(IVLCmd::assign(name, expr))
+            //}
+        },
         CmdKind::Match { body } => {
             let mut cases: Vec<IVLCmd> = vec![];
             for case in &body.cases {
@@ -126,12 +135,11 @@ fn cmd_to_ivlcmd(
         }
         CmdKind::Return { expr } => {
             let mut ivl_cmds = Vec::new();
-
+            ivl_cmds.push(IVLCmd::return_ivl(expr));
             for (post_expr, msg) in post_condition.iter() {
                 ivl_cmds.push(IVLCmd::assert(post_expr, msg));
             }
 
-            ivl_cmds.push(IVLCmd::return_ivl(expr));
 
             ivl_cmds.push(IVLCmd::assume(&Expr::bool(false)));
 
@@ -140,38 +148,42 @@ fn cmd_to_ivlcmd(
         CmdKind::Loop {
             invariants, body, ..} => {
             let mut ivl_cmds: Vec<IVLCmd> = Vec::new();
-
+            let mut case_bodies = Vec::new();
+            let mut all_conditions = Expr::bool(true);
+            let mut all_invariants = Expr::bool(true);
             for inv in invariants {
-                ivl_cmds.push(IVLCmd::assert(
-                    inv,
-                    "Loop invariant doesn't hold before the loop.",
-                ));
+                all_invariants = all_invariants.and(&inv);
             }
+
+            //First assert invariants
+            ivl_cmds.push(IVLCmd::assert(&all_invariants,"Loop invariants might not hold before the loop"));
+            
+            //Havoc chars, to emulate all possible inputs
             let vars = cmd.clone().assigned_vars();
             for var in vars {
                 ivl_cmds.push(IVLCmd::havoc(&var.0, &var.1));
             }
-            for inv in invariants {
-                ivl_cmds.push(IVLCmd::assume(inv));
-            }
-            // Hvis b, push hele body som ivl
+            
+            //Assume invariants, to make sure the havoc stays in the scope of invariants.
+            ivl_cmds.push(IVLCmd::assume(&all_invariants));
+
+            //Creating all conditions and encodings for C
             for case in &body.cases {
-                let condition = IVLCmd::assume(&case.condition);
-                ivl_cmds.push(condition);
+                all_conditions = all_conditions.and(&case.condition);
 
-                let encoded_cmd = cmd_to_ivlcmd(&case.cmd, post_condition)?; 
-                ivl_cmds.push(encoded_cmd);
-
-                for inv in invariants {
-                    ivl_cmds.push(IVLCmd::assert(
-                        inv,
-                        "Loop invariant doesn't hold during the loop.",
-                    ));
-                }
+                case_bodies.push(cmd_to_ivlcmd(&case.cmd, post_condition)?); 
             }
 
-            // Hvis et invariant fejler tidligere, vil dette kassere de stier, der fejler.
-            ivl_cmds.push(IVLCmd::assume(&Expr::bool(false)));
+            let if_body1 = IVLCmd::seq(&IVLCmd::assume(&all_conditions),
+                                                &IVLCmd::seqs(&case_bodies));
+            let if_body2 = IVLCmd::seq(&IVLCmd::assert(&all_invariants, "Loop invariants might not hold during the loop"),
+                                                &IVLCmd::assume(&Expr::bool(false)));
+            let if_body_complete = IVLCmd::seq(&if_body1, &if_body2);
+
+            let if_else_body = IVLCmd::nondet(&if_body_complete, &IVLCmd::assume(&all_conditions.prefix(PrefixOp::Not)));
+            // Pushed the if else IVL command to the stack.
+            ivl_cmds.push(if_else_body);
+
             Ok(IVLCmd::seqs(&ivl_cmds))
         }
 

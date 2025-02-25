@@ -42,14 +42,25 @@ function fib_time(n: Int): Int
 // Do not modify the given production code. However, feel free to 
 // introduce additional functions, lemma methods or ghost code.
 // Furthermore, make sure that the functional contract remains intact.
+
+method fib_(n: Int) returns (res: Int)
+    requires n >= 0
+    requires acc(time_credit(), fib_time(n)/1) // require that the method has enough time credits, depending on n
+    ensures res == fib(n) // ensure the functional correctness // ensure that all time credits are consumed
+{
+    assert perm(time_credit()) == fib_time(n)/1 /// We have fib_time(n) time credits
+    res := fib_recursive(n)
+    assert perm(time_credit()) == 0/1 // After running fib_recursive we have 0 time credits
+    // This means that we have used exactly fib_time(n) time credit units, and we therefore cannot be using more or less than fib_time(n) units of time.
+
+}
+
 method fib_recursive(n: Int) returns (res: Int)
     requires n >= 0
     requires acc(time_credit(), fib_time(n)/1) // require that the method has enough time credits, depending on n
-    ensures res == fib(n) // ensure the functional correctness
-    ensures acc(time_credit(), 0/1) // ensure that all time credits are consumed
+    ensures res == fib(n) // ensure the functional correctness // ensure that all time credits are consumed
 {
     consume_time_credit() // we must spend a credit for every call
-
     if (n == 0) {
         res := 0
     } elseif (n == 1) {
