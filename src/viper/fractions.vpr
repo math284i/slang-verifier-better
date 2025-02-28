@@ -1,0 +1,57 @@
+field next: Ref
+field elem: Int
+
+
+
+predicate P(this: Ref) {
+    acc(this.elem, 1/2)
+}
+
+method test(this: Ref)
+{
+    inhale acc(this.elem)
+    assert acc(this.elem, 1/1)
+    fold P(this) // multiply permissions
+    assert acc(P(this), 1/1)
+    assert acc(this.elem, 1/2)
+    fold P(this)
+    assert acc(P(this), 2/1)
+    assert acc(this.elem, 0/1)
+    inhale acc(this.elem, 2/3)
+    fold P(this)
+    exhale P(this) && P(this) && P(this) //Gives up the perms, not returns them
+    //assert false
+}
+
+method inhale_exhale_addition(this: Ref)
+{
+    inhale acc(this.elem)
+    assert acc(this.elem, write)
+    exhale acc(this.elem, 2/3)
+    //assert acc(this.elem, write)
+    assert acc(this.elem, 1/8)
+    assert acc(this.elem, 1/3)
+    inhale acc(this.elem, 1/9)
+    assert acc(this.elem, 1/3)
+    assert acc(this.elem, 4/9)
+}
+
+method fold_unfold_multiplies(this: Ref)
+{
+    inhale acc(this.elem) // 1/1
+    assert acc(this.elem, 1/1)
+    fold P(this) // exhaling acc(this.elem, 1/2); inhaling P(this)
+    assert acc(this.elem, 1/2) && P(this)
+
+    unfold acc(P(this), 1/2) // exhale acc(P(this), 1/2); inhale 1/2*body
+    // inhale acc(this.elem, 1/2*1/2)
+
+
+    assert acc(P(this), 1/4)
+    assert acc(this.elem, 3/4)
+
+    // inhale acc(x.f,p) --> add p
+    // exhale acc(x.f,p) --> subtract p; havoc if perm x.f become 0
+    // unfold acc(P(x), p) --> exhale acc(P(x), p); inhale "p*body(P(x))"
+    // fold acc(P(x),p) --> exhale "p*body(P(x))"; inhale acc(P(x),p)
+}

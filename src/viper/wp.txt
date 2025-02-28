@@ -1,0 +1,14 @@
+x = x + 1
+
+post cond = x > 5 
+
+Before x = x + 1, x must have been at least 5 for the result to be greater than 5.
+So, the weakest precondition is x > 4.
+
+
+
+strongest post condition:
+
+precondition x>5
+x:=x+1
+Strongest postcondition: x>6
