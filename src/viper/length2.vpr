@@ -1,0 +1,44 @@
+field next: Ref
+
+predicate lseg(this: Ref, last: Ref) {
+    this != last ==> acc(this.next) && lseg(this.next, last)
+}
+
+method addAtEnd(this: Ref, n: Ref, nn: Ref)
+    requires lseg(this, n) && acc(n.next) && n.next == nn
+    ensures  lseg(this, nn)
+{
+    if(this == n) {
+        fold lseg(nn, nn)
+        fold lseg(this, nn)
+    } else {
+        unfold lseg(this, n)
+        addAtEnd(this.next, n, nn)
+        fold lseg(this, nn)
+    }
+}
+
+
+
+method length(this: Ref) returns (res: Int)
+    requires this != null && lseg(this, null)
+    ensures lseg(this, null) //Recovered the post cond
+{
+    res := 0
+    var curr: Ref := this
+    unfold lseg(this, null)
+    fold lseg(this, curr)
+    while (curr.next != null)
+       invariant lseg(this, curr) // Already visited
+       invariant acc(curr.next) // current node
+       invariant lseg(curr.next, null) // to be visited
+    {
+        res := res + 1
+        var tmp: Ref := curr.next
+        addAtEnd(this, curr, curr.next) // For moving perms
+        curr := tmp
+        unfold lseg(curr, null)
+    }
+    assert curr.next == null
+    addAtEnd(this, curr, null)
+}

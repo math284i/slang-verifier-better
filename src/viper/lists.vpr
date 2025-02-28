@@ -1,0 +1,30 @@
+field elem: Int
+field next: Ref
+
+
+predicate list(this: Ref) 
+{
+    acc(this.elem) && acc(this.next) &&
+    (this.next != null ==> list(this.next))
+}
+
+
+
+method append(this: Ref, e: Int)
+  requires list(this) // permission to all nodes
+  ensures list(this) // list was extended
+{
+  unfold list(this)
+  if(this.next==null){
+    var n:Ref
+    n:=new(*)
+    n.next:=null
+    this.elem:=e
+    this.next:=n
+    fold list(n)
+    assert acc(list(this.next))
+  } else {
+    append(this.next,e)
+  }
+  fold list(this)
+}

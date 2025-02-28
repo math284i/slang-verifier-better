@@ -1,0 +1,16 @@
+field f: Int
+
+method alias(a: Ref, b: Ref) 
+    requires acc(a.f) && acc(b.f)
+{
+    a.f := 10
+    b.f := 5
+    assert a != b
+    assert a.f == 10
+}
+
+method alias2(a: Ref, b: Ref)
+    requires acc(a.f) && acc(b.f)
+{
+    assert a != b
+}

@@ -1,0 +1,32 @@
+field f: Int
+
+method free(x: Ref) //Transfers permission to this method, but never return it
+//Since the access is never given again, it is lost forever and can be
+//Garbage collected
+    requires acc(x.f)
+    ensures true
+
+method client1()
+{
+    var x: Ref
+    var y: Ref
+
+    x := new(f)
+    y := new(f)
+
+    free(x)
+    y.f := 10
+
+    assert perm(x.f) == 0/1
+    assert perm(y.f) == 1/1
+
+
+    inhale acc(x.f) && y.f == 2 //Obtains permission and assumes F
+    //This is unsound, since it takes 
+    assert perm(x.f) == 1/1
+    exhale acc(y.f) && y.f == 10 // asserts logical constraints, then check and removes 
+    //All permissions of exhale F
+    assert perm(y.f) == 0/1
+
+}
+

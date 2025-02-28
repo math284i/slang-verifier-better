@@ -1,0 +1,25 @@
+field next: Ref
+field elem: Int
+
+predicate list(this: Ref, content: Seq[Int]) {
+    acc(this.elem) && acc(this.next) && 
+    (this.next == null ==> content == Seq[Int]()) &&
+    (this.next != null ==> 0 < |content| && content[0] == this.elem 
+        && list(this.next, content[1..]))
+}
+
+method prepend(this: Ref, e: Int, c: Seq[Int]) returns (res: Ref)
+    requires list(this, c)
+    ensures list(res, Seq(e) ++ c)
+    //requires list(this)
+    //ensures  list(res)
+    // TODO: add reasonable specification including a function spec
+{
+    assert unfolding list(this, c) in true // It only learns of 
+    // this != null after access predicates, after an unfold
+    
+    res := new(*)
+    res.elem := e
+    res.next := this
+    fold list(res, Seq(e) ++ c)
+}

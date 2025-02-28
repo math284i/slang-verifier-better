@@ -1,0 +1,19 @@
+field f: Int
+ 
+method use(x: Ref)
+    requires acc(x.f, 1/2)
+    ensures acc(x.f, 1/2)
+{
+}
+ 
+method free(x: Ref)
+    requires acc(x.f)
+ 
+method test()
+{
+    var x: Ref
+    x := new(*)
+    x.f := 17
+    free(x)
+    use(x)
+}

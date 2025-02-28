@@ -1,0 +1,32 @@
+field f: Int
+
+method reset(x: Ref) 
+    requires acc(x.f)
+    ensures acc(x.f) && x.f == 0
+{
+    x.f := 0
+}
+
+method client1()
+{
+    var x: Ref
+
+    x := new(f)   // When constructed it is given permission
+    inhale acc(x.f) // Give permission again
+    
+    assert false // Verifies, due to 2 permissions
+
+}
+/*
+method client2()
+{
+    var x: Ref
+    inhale acc(x.f) && x.f == 5
+    reset(x)
+    assert x.f == 5 
+    assert x.f == 10 
+    assert false 
+    // If there was no havoc, it would fail. Since x.f == 5 would be retained
+    // leading to x.f = 0 && x.f = 5
+}
+*/

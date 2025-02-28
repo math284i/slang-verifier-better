@@ -1,0 +1,101 @@
+field next: Ref
+field elem: Int
+
+predicate list(this: Ref) {
+    acc(this.elem) && acc(this.next) && 
+    (this.next != null ==> list(this.next))
+}
+
+method head(this: Ref) returns (res: Int)
+  requires list(this)
+  ensures  list(this)
+{
+    unfold list(this)
+    res := this.elem
+    fold list(this)
+}
+
+method append(this: Ref, e: Int) 
+    requires list(this)
+    ensures  list(this)
+{
+    unfold list(this)
+    if(this.next == null) {
+        var n: Ref
+        n := new(*)
+        n.next := null
+        this.elem := e
+        this.next := n
+        fold list(n)
+    } else {
+        append(this.next, e)
+    }
+    fold list(this)
+}
+
+
+
+method create() returns (res: Ref)
+ensures list(res)
+{
+    res := new(*)
+    res.next := null
+    fold list(res)
+}
+
+method prepend(this: Ref, e: Int) returns (res: Ref)
+    requires list(this)
+    ensures list(res)
+{
+    res := new(*)
+    res.next := this
+    res.elem := e
+    fold list(res)
+}
+
+method concat(this: Ref, that: Ref)
+    requires list(this) && list(that)
+    ensures list(this)
+{
+    unfold list(this)
+    if (this.next == null)
+    {
+        unfold list(that)
+        this.next := that.next
+        this.elem := that.elem
+    }
+    else {
+        concat(this.next, that)
+    }
+    fold list(this)
+}
+
+
+method reverse(this: Ref) returns (res: Ref)
+    requires list(this)
+    ensures list(res)
+{   
+    res := reverseHelper(this, null)
+}
+
+// TODO: you might want to use this
+method reverseHelper(this: Ref, last: Ref) returns (res: Ref)
+    requires list(this) && (last != null ==> list(last))
+    ensures list(res)
+{
+    unfold list(this)
+    if (this.next == null)
+    {
+        res := this
+        this.next := last
+        fold list(res)
+    }
+    else {
+        var n: Ref
+        n := this.next
+        this.next := last
+        fold list(this)
+        res := reverseHelper(n, this)
+    }
+
+}

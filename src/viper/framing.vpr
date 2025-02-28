@@ -1,0 +1,16 @@
+field f: Int
+
+method set(p: Ref, v: Int)
+    requires acc(p.f)
+    ensures acc(p.f) && p.f == v
+{
+    p.f := v
+}
+
+method client1(x: Ref, y: Ref)
+    requires acc(x.f) && acc(y.f)
+{   
+    y.f := 10
+    set(x,5)
+    assert x.f == 5 && y.f == 10
+}

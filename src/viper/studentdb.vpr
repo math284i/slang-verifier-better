@@ -1,0 +1,61 @@
+field ects: Int
+field id: Int
+
+method register(student_id: Int) returns (student: Ref)
+    ensures acc(student.id) && acc(student.ects)
+    ensures student.id == student_id && student.ects == 0
+{   
+    student := new(*)
+    student.id := student_id
+    student.ects := 0
+}
+
+method exam(student: Ref, credits: Int)
+    requires acc(student.ects) && acc(student.id)
+    requires credits > 0
+    ensures acc(student.ects) && acc(student.id)
+    ensures student.id == old(student.id)
+    ensures student.ects == old(student.ects) + credits
+{
+    student.ects := student.ects + credits
+}
+
+
+method finish(student: Ref) returns (grad: Bool)
+    requires acc(student.ects) && acc(student.id)
+    ensures grad <==> old(student.ects) >= 120
+{
+    if (student.ects >= 120)
+    {
+        grad := true
+    }
+    else
+    {
+        grad := false
+    }
+}
+
+
+
+
+method client1()
+{
+    var alice: Ref
+    var bob: Ref
+    alice := register(123)
+    bob := register(567)
+    assert alice != bob
+    assert alice.ects + bob.ects == 0
+    exam(alice,10)
+    exam(bob,15)
+    var done: Bool
+    done := finish(bob)
+    assert !done
+    //Should fail
+    //assert bob.ects < 120
+    exam(alice,15)
+    exam(alice,15)
+    exam(alice,80)
+    done := finish(alice)
+    assert done
+}

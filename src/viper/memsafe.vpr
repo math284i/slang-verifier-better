@@ -1,0 +1,31 @@
+field f: Int 
+
+method uninitialized() 
+{
+  var x: Ref 
+  x.f := 5
+}
+
+method null_pointer_dereference() 
+{
+  var x: Ref 
+  x := null
+  x.f := 5
+}
+
+method free(p: Ref) 
+  requires acc(p.f)
+
+method use_after_free(x: Ref)
+  requires acc(x.f)
+{
+  free(x)
+  x.f := 5
+}
+
+method double_free(x: Ref)
+  requires acc(x.f)
+{
+  free(x)
+  free(x)
+}
